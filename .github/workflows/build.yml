@@ -1,99 +1,92 @@
-name: Build AdGuardHome rules   # 工作流名称，可以在 GitHub Actions 面板看到
+name: Build AdGuardHome rules
 
 on:
   schedule:
     - cron: "0 0 * * *"     # 每天 0 点 UTC（北京时间早上 8 点）
     - cron: "0 12 * * *"    # 每天 12 点 UTC（北京时间晚上 8 点）
-  workflow_dispatch:            # 支持手动触发（方便测试）
+  workflow_dispatch:         # 支持手动触发
 
 jobs:
   build:
-    runs-on: ubuntu-latest      # 使用最新版 Ubuntu runner 环境
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        # 把当前仓库代码拉取到 runner 环境
 
       - name: Download rules
         run: |
           mkdir -p download
-          # 下载各种规则源（你可以按需增删）
-          curl -sSL https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/all.txt > download/CJX's Annoyance List.txt
-          curl -sSL https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt > download/skyrules.txt
-          curl -sSL https://easylist-downloads.adblockplus.org/easylist.txt > download/EasyList.txt
-          curl -sSL https://easylist-downloads.adblockplus.org/easylistchina.txt > download/EasyList China.txt
-          curl -sSL https://easylist.to/easylist/easyprivacy.txt > download/Eeasyprivacy.txt
-          curl -sSL https://easylist-downloads.adblockplus.org/easyprivacy.txt > download/EasyPrivacy1.txt
-          curl -sSL https://anti-ad.net/easylist.txt > download/Anti-AD.txt
-          curl -sSL https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/dns.txt > download/GOODBYEADS.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_49.txt > download/Ultimate Blocklist.txt
-          curl -sSL https://filters.adtidy.org/android/filters/15_optimized.txt > download/AdGuard DNS filter (Optimized).txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_51.txt > download/HaGeZi Pro++ Blocklist.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_48.txt > download/HaGeZi Pro Blocklist.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_34.txt > download/HaGeZi Normal Blocklist.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt > download/CHN AdRules DNS List.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_44.txt > download/HaGeZi Threat Intelligence Feeds.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_55.txt > download/HaGeZi Badware Hoster Blocklist.txt
-          curl -sSL https://adguardteam.github.io/HostlistsRegistry/assets/filter_54.txt > download/HaGeZi DynDNS Blocklist.txt
-          curl -sSL https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt > download/HaGeZi Light DNS Blocklist.txt
-          curl -sSL https://filters.adtidy.org/android/filters/11_optimized.txt > download/Adguard.txt
-          curl -sSL https://filters.adtidy.org/android/filters/17_optimized.txt > download/Adguard URL.txt
-          curl -sSL https://filters.adtidy.org/android/filters/224_optimized.txt > download/Adguard China.txt
-          curl -sSL https://filters.adtidy.org/android/filters/14_optimized.txt > download/Adguard optimized.txt
-          curl -sSL https://filters.adtidy.org/android/filters/19_optimized.txt > download/AdGuard Popups filter (Optimized).txt
-          curl -sSL https://malware-filter.gitlab.io/malware-filter/phishing-filter-ag.txt > download/phishing-filter-ag.txt
-          curl -sSL https://urlhaus-filter.pages.dev/urlhaus-filter-ag-online.txt > download/Online Malicious URL Blocklist (AdGuard).txt
-          curl -sSL https://filters.adtidy.org/android/filters/228_optimized.txt > download/xinggsf.txt
-          curl -sSL https://filters.adtidy.org/android/filters/251_optimized.txt > download/Legitimate URL Shortener (Optimized).txt
-          curl -sSL https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&mimetype=plaintext > download/Peter Lowe Blocklist.txt
-          curl -sSL https://www.fanboy.co.nz/fanboy-antifacebook.txt > download/Anti-Facebook List.txt
-          curl -sSL https://fanboy.co.nz/fanboy-antifonts.txt > download/Fanboy Anti-thirdparty Fonts.txt
-          curl -sSL https://ublockorigin.github.io/uAssetsCDN/filters/lan-block.txt > download/Block Outsider Intrusion into LAN.txt
-          curl -sSL https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt > download/AdGuard DNS filter.txt
-          curl -sSL https://raw.githubusercontent.com/Cats-Team/AdRules/main/dns.txt > download/AdRules DNS List.txt   
-          curl -sSL https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt > download/CJXs Annoyance List.txt
-          curl -sSL https://raw.githubusercontent.com/xinggsf/Adblock-Plus-Rule/master/mv.txt > download/uBlock Origin 1.56.txt
-          curl -sSL https://raw.githubusercontent.com/damengzhu/banad/main/jiekouAD.txt > download/jiekouAD.txt
-          curl -sSL https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/AWAvenue-Ads-Rule.txt > download/AWAvenue Ads Rule.txt
-          curl -sSL https://hblock.molinero.dev/hosts_adblock.txt > download/Hblock.txt
-          curl -sSL https://abp.oisd.nl/basic/ > download/oisd_small_abp.txt
-          curl -sSL https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts > download/StevenBlack hosts.txt
-          curl -sSL https://someonewhocares.org/hosts/hosts > download/Pollock hosts.txt
-          # 这里还可以加你自建的 raw.githubusercontent 链接
-          # 例如：
-          # curl -sSL https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/myrules.txt > download/myrules.txt
+          # 定义规则源列表
+          RULES=(
+            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/all.txt"
+            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
+            "https://easylist-downloads.adblockplus.org/easylist.txt"
+            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
+            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
+            "https://anti-ad.net/easylist.txt"
+            "https://raw.githubusercontent.com/8680/GOODBYEADS/master/data/rules/dns.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_49.txt"
+            "https://filters.adtidy.org/android/filters/15_optimized.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_51.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_48.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_34.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_29.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_44.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_55.txt"
+            "https://adguardteam.github.io/HostlistsRegistry/assets/filter_54.txt"
+            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
+            "https://filters.adtidy.org/android/filters/11_optimized.txt"
+            "https://filters.adtidy.org/android/filters/17_optimized.txt"
+            "https://filters.adtidy.org/android/filters/224_optimized.txt"
+            "https://filters.adtidy.org/android/filters/14_optimized.txt"
+            "https://filters.adtidy.org/android/filters/19_optimized.txt"
+            "https://malware-filter.gitlab.io/malware-filter/phishing-filter-ag.txt"
+            "https://urlhaus-filter.pages.dev/urlhaus-filter-ag-online.txt"
+            "https://filters.adtidy.org/android/filters/228_optimized.txt"
+            "https://filters.adtidy.org/android/filters/251_optimized.txt"
+            "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=adblockplus&mimetype=plaintext"
+            "https://www.fanboy.co.nz/fanboy-antifacebook.txt"
+            "https://fanboy.co.nz/fanboy-antifonts.txt"
+            "https://ublockorigin.github.io/uAssetsCDN/filters/lan-block.txt"
+            "https://adguardteam.github.io/AdGuardSDNSFilter/Filters/filter.txt"
+            "https://raw.githubusercontent.com/Cats-Team/AdRules/main/dns.txt"
+            "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
+            "https://raw.githubusercontent.com/xinggsf/Adblock-Plus-Rule/master/mv.txt"
+            "https://raw.githubusercontent.com/damengzhu/banad/main/jiekouAD.txt"
+            "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/AWAvenue-Ads-Rule.txt"
+            "https://hblock.molinero.dev/hosts_adblock.txt"
+            "https://abp.oisd.nl/basic/"
+            "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+            "https://someonewhocares.org/hosts/hosts"
+          )
+
+          for URL in "${RULES[@]}"; do
+            FILENAME=$(basename "$URL")
+            echo "Downloading $URL -> download/$FILENAME"
+            curl -sSL "$URL" -o "download/$FILENAME" || echo "Failed: $URL"
+          done
 
       - name: Merge & Dedup
         run: |
           mkdir -p dist
-          # 合并所有下载的规则文件
-          # 1. 去掉注释行（以 ! 或 # 开头）
-          # 2. 去掉空行
-          # 3. 排序并去重
-          # 最终输出 dist/AdGuardHome.txt
-          cat download/*.txt | \
-            grep -vE '^\s*!' | grep -vE '^#' | sed '/^$/d' | \
-            sort -u > dist/AdGuardHome.txt
+          # 合并去重，过滤注释和空行
+          awk '!/^(\s*!|#|$)/ {print $0}' download/* | sort -u > dist/AdGuardHome.txt
 
-          # 在文件开头加上说明注释
-          sed -i '1i ! ==========================================' dist/AdGuardHome.txt
-          sed -i '2i ! 自建 AdGuard Home 合并去重规则' dist/AdGuardHome.txt
-          sed -i "3i ! 更新时间：$(date -u +%Y-%m-%d\ %H:%M:%S) UTC" dist/AdGuardHome.txt
-          sed -i '4i ! 来源：easylist, cjxlist, hagezi-pro 等' dist/AdGuardHome.txt
-          sed -i '5i ! ==========================================' dist/AdGuardHome.txt
+          # 添加文件头部说明
+          {
+            echo "! =========================================="
+            echo "! 自建 AdGuard Home 合并去重规则"
+            echo "! 更新时间：$(date -u +%Y-%m-%d\ %H:%M:%S) UTC"
+            echo "! 来源：easylist, cjxlist, hagezi-pro 等"
+            echo "! =========================================="
+            cat dist/AdGuardHome.txt
+          } > dist/AdGuardHome.tmp && mv dist/AdGuardHome.tmp dist/AdGuardHome.txt
 
       - name: Commit & Push
         run: |
-          # 设置提交者身份（必须）
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-
-          # 添加更新内容
           git add dist/AdGuardHome.txt
-
-          # 提交（如果没有变化则忽略）
           git commit -m "Update rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
-
-          # 推送到 GitHub
           git push
