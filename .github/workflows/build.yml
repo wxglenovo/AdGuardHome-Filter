@@ -84,9 +84,12 @@ jobs:
           } > dist/AdGuardHome.tmp && mv dist/AdGuardHome.tmp dist/AdGuardHome.txt
 
       - name: Commit & Push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add dist/AdGuardHome.txt
           git commit -m "Update rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
-          git push
+          # 使用 GITHUB_TOKEN 推送
+          git push "https://${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" HEAD:main
