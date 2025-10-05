@@ -79,11 +79,9 @@ jobs:
             cat dist/AdGuardHome.txt
           } > dist/AdGuardHome.tmp && mv dist/AdGuardHome.tmp dist/AdGuardHome.txt
 
-          # 统计总规则数
           TOTAL_RULES=$(wc -l < dist/AdGuardHome.txt)
           echo "total_rules=$TOTAL_RULES" >> $GITHUB_ENV
 
-          # 统计新增规则
           if [ -f dist/AdGuardHome.prev.txt ]; then
             comm -13 <(sort dist/AdGuardHome.prev.txt) <(sort dist/AdGuardHome.txt) > dist/AdGuardHome.new.txt
             NEW_RULES=$(wc -l < dist/AdGuardHome.new.txt)
@@ -114,7 +112,7 @@ jobs:
           merge-method: merge
 
       - name: Upload New Rules Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: AdGuardHome-new-rules
           path: dist/AdGuardHome.new.txt
@@ -125,5 +123,5 @@ jobs:
           echo "总规则数: ${{ env.total_rules }}"
           echo "新增规则数: ${{ env.new_rules }}"
           echo "新增规则（最多前100条）:"
-          head -n 10000000 dist/AdGuardHome.new.txt
+          head -n 100 dist/AdGuardHome.new.txt
           echo "============================================================"
