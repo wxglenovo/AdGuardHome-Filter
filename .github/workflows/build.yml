@@ -92,7 +92,8 @@ jobs:
           echo "new_rules=$NEW_RULES" >> $GITHUB_ENV
           cp dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
 
-      - name: Create & Merge Pull Request
+      - name: Create Pull Request
+        id: create_pr
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -107,8 +108,14 @@ jobs:
 
             **新增规则预览（最多 100 条）：**  
             ```  
-            $(head -n 100 dist/AdGuardHome.new.txt)  
+            $(head -n 100000000 dist/AdGuardHome.new.txt)  
             ```
+
+      - name: Auto Merge PR
+        uses: peter-evans/merge-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ steps.create_pr.outputs.pull-request-number }}
           merge-method: merge
 
       - name: Upload New Rules Artifact
@@ -123,5 +130,5 @@ jobs:
           echo "总规则数: ${{ env.total_rules }}"
           echo "新增规则数: ${{ env.new_rules }}"
           echo "新增规则（最多前100条）:"
-          head -n 100 dist/AdGuardHome.new.txt
+          head -n 100000000 dist/AdGuardHome.new.txt
           echo "============================================================"
