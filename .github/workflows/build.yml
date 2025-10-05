@@ -83,7 +83,7 @@ jobs:
           TOTAL_RULES=$(wc -l < dist/AdGuardHome.txt)
           echo "total_rules=$TOTAL_RULES" >> $GITHUB_ENV
 
-          # 统计新增规则并保存高亮
+          # 统计新增规则
           if [ -f dist/AdGuardHome.prev.txt ]; then
             comm -13 <(sort dist/AdGuardHome.prev.txt) <(sort dist/AdGuardHome.txt) > dist/AdGuardHome.new.txt
             NEW_RULES=$(wc -l < dist/AdGuardHome.new.txt)
@@ -94,9 +94,8 @@ jobs:
           echo "new_rules=$NEW_RULES" >> $GITHUB_ENV
           cp dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
 
-      - name: Create Pull Request
+      - name: Create & Merge Pull Request
         uses: peter-evans/create-pull-request@v5
-        id: cpr
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Update rules $(date -u +%Y-%m-%d)"
@@ -108,18 +107,17 @@ jobs:
             **总规则数**: ${{ env.total_rules }}  
             **新增规则数**: ${{ env.new_rules }}  
 
-            **新增规则预览**（仅部分，最多 100 条）：  
+            **新增规则预览（最多 100 条）：**  
             ```  
             $(head -n 100 dist/AdGuardHome.new.txt)  
             ```
+          merge-method: merge
 
-      - name: Merge Pull Request
-        if: steps.cpr.outputs.pull-request-number != ''
-        uses: actions-ecosystem/action-pull-request@v2
+      - name: Upload New Rules Artifact
+        uses: actions/upload-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pull_request_number: ${{ steps.cpr.outputs.pull-request-number }}
-          merge_method: merge
+          name: AdGuardHome-new-rules
+          path: dist/AdGuardHome.new.txt
 
       - name: Show Rules Stats in Actions Log
         run: |
