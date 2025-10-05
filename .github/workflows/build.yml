@@ -10,8 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write   # 允许写入 main 分支
 
     steps:
       - name: Checkout
@@ -74,6 +73,7 @@ jobs:
           mkdir -p dist
           # 去掉注释和空行，排序去重
           awk '!/^(\s*!|#|$)/ {print $0}' download/* | sort -u > dist/AdGuardHome.txt
+          
           # 在文件开头加说明
           {
             echo "! =========================================="
@@ -87,6 +87,7 @@ jobs:
           TOTAL_RULES=$(wc -l < dist/AdGuardHome.txt)
           echo "total_rules=$TOTAL_RULES" >> $GITHUB_ENV
 
+          # 新旧规则比较
           if [ -f dist/AdGuardHome.prev.txt ]; then
             comm -13 <(sort dist/AdGuardHome.prev.txt) <(sort dist/AdGuardHome.txt) > dist/AdGuardHome.new.txt
             NEW_RULES=$(wc -l < dist/AdGuardHome.new.txt)
@@ -94,37 +95,17 @@ jobs:
             cp dist/AdGuardHome.txt dist/AdGuardHome.new.txt
             NEW_RULES=$TOTAL_RULES
           fi
+
           echo "new_rules=$NEW_RULES" >> $GITHUB_ENV
           cp dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
 
-      - name: Create Pull Request
-        id: create_pr
-        uses: peter-evans/create-pull-request@v7
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "Update rules $(date -u +%Y-%m-%d)"
-          branch: update-rules
-          base: main
-          title: "Update AdGuard Home rules $(date -u +%Y-%m-%d)"
-          body: |
-            自动合并更新规则  
-            **总规则数**: ${{ env.total_rules }}  
-            **新增规则数**: ${{ env.new_rules }}  
-
-            **新增规则预览（最多 100 条）：**  
-            ```  
-            $(head -n 100000000000000000 dist/AdGuardHome.new.txt)  
-            ```
-
-      - name: Auto Merge PR
+      - name: Commit & Push
         run: |
-          gh auth setup-git
-          PR_NUMBER=$(gh pr list --state open --head update-rules --json number -q '.[0].number')
-          if [ -n "$PR_NUMBER" ]; then
-            gh pr merge "$PR_NUMBER" --merge --auto --admin
-          else
-            echo "No open PR found to merge."
-          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
+          git commit -m "Update rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
+          git push origin main
 
       - name: Upload New Rules Artifact
         uses: actions/upload-artifact@v4
@@ -137,5 +118,6 @@ jobs:
           echo "================= AdGuardHome Rules Update ================="
           echo "总规则数: ${{ env.total_rules }}"
           echo "新增规则数: ${{ env.new_rules }}"
-          head -n 100000000000000000 dist/AdGuardHome.new.txt
+          echo "---------------- 新增规则预览（最多前 50 条） ----------------"
+          head -n 50 dist/AdGuardHome.new.txt
           echo "============================================================"
