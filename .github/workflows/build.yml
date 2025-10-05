@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # 必须，否则无法推送/创建 Release
+  contents: write   # 必须，否则可以推送/创建 Release
 
 jobs:
   build:
@@ -76,13 +76,13 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          # 去掉空行和 ! 注释行，去重
-          grep -v '^$' tmp/all.txt | grep -v '^!' | sort -u > tmp/merged.txt
+          # 去掉空行和开头 ! 或 # 注释行，去重
+          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
 
           # 计算规则条数
           rule_count=$(wc -l < tmp/merged.txt)
 
-          # 设置 Release tag 环境变量
+          # 设置 Release tag 环境变量（合法字符）
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
 
           # 生成最终规则文件，头部加生成信息
