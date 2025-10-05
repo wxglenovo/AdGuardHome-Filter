@@ -1,0 +1,62 @@
+name: Build AdGuardHome rules   # 工作流名称，可以在 GitHub Actions 面板看到
+
+on:
+  schedule:
+    - cron: "0 0 * * *"         # 定时任务：每天 0 点 (UTC 时间) 自动运行
+                                # 注意：UTC 0 点 = 北京时间早上 8 点
+  workflow_dispatch:            # 支持手动触发（方便测试）
+
+jobs:
+  build:
+    runs-on: ubuntu-latest      # 使用最新版 Ubuntu runner 环境
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        # 把当前仓库代码拉取到 runner 环境
+
+      - name: Download rules
+        run: |
+          mkdir -p download
+          # 下载各种规则源（你可以按需增删）
+          curl -sSL https://easylist-downloads.adblockplus.org/easylist.txt > download/easylist.txt
+          curl -sSL https://easylist-downloads.adblockplus.org/easylistchina.txt > download/easylistchina.txt
+          curl -sSL https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjxlist.txt > download/cjxlist.txt
+          curl -sSL https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt > download/hagezi-pro.txt
+          # 这里还可以加你自建的 raw.githubusercontent 链接
+          # 例如：
+          # curl -sSL https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/myrules.txt > download/myrules.txt
+
+      - name: Merge & Dedup
+        run: |
+          mkdir -p dist
+          # 合并所有下载的规则文件
+          # 1. 去掉注释行（以 ! 或 # 开头）
+          # 2. 去掉空行
+          # 3. 排序并去重
+          # 最终输出 dist/AdGuardHome.txt
+          cat download/*.txt | \
+            grep -vE '^\s*!' | grep -vE '^#' | sed '/^$/d' | \
+            sort -u > dist/AdGuardHome.txt
+
+          # 在文件开头加上说明注释
+          sed -i '1i ! ==========================================' dist/AdGuardHome.txt
+          sed -i '2i ! 自建 AdGuard Home 合并去重规则' dist/AdGuardHome.txt
+          sed -i "3i ! 更新时间：$(date -u +%Y-%m-%d\ %H:%M:%S) UTC" dist/AdGuardHome.txt
+          sed -i '4i ! 来源：easylist, cjxlist, hagezi-pro 等' dist/AdGuardHome.txt
+          sed -i '5i ! ==========================================' dist/AdGuardHome.txt
+
+      - name: Commit & Push
+        run: |
+          # 设置提交者身份（必须）
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+
+          # 添加更新内容
+          git add dist/AdGuardHome.txt
+
+          # 提交（如果没有变化则忽略）
+          git commit -m "Update rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
+
+          # 推送到 GitHub
+          git push
