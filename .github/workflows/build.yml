@@ -2,8 +2,8 @@ name: Build AdGuardHome rules   # 工作流名称，可以在 GitHub Actions 面
 
 on:
   schedule:
-    - cron: "0 0 * * *"         # 定时任务：每天 0 点 (UTC 时间) 自动运行
-                                # 注意：UTC 0 点 = 北京时间早上 8 点
+    - cron: "0 0 * * *"     # 每天 0 点 UTC（北京时间早上 8 点）
+    - cron: "0 12 * * *"    # 每天 12 点 UTC（北京时间晚上 8 点）
   workflow_dispatch:            # 支持手动触发（方便测试）
 
 jobs:
