@@ -2,13 +2,16 @@ name: Build AdGuardHome rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 12 * * *"
+    - cron: "0 0 * * *"    # 每天 0 点 UTC
+    - cron: "0 12 * * *"   # 每天 12 点 UTC
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout
@@ -69,7 +72,9 @@ jobs:
       - name: Merge & Dedup
         run: |
           mkdir -p dist
+          # 去掉注释和空行，排序去重
           awk '!/^(\s*!|#|$)/ {print $0}' download/* | sort -u > dist/AdGuardHome.txt
+          # 在文件开头加说明
           {
             echo "! =========================================="
             echo "! 自建 AdGuard Home 合并去重规则"
@@ -108,11 +113,12 @@ jobs:
 
             **新增规则预览（最多 100 条）：**  
             ```  
-            $(head -n 100000000000 dist/AdGuardHome.new.txt)  
+            $(head -n 100000000000000000 dist/AdGuardHome.new.txt)  
             ```
 
       - name: Auto Merge PR
         run: |
+          gh auth setup-git
           PR_NUMBER=$(gh pr list --state open --head update-rules --json number -q '.[0].number')
           if [ -n "$PR_NUMBER" ]; then
             gh pr merge "$PR_NUMBER" --merge --auto --admin
@@ -126,11 +132,10 @@ jobs:
           name: AdGuardHome-new-rules
           path: dist/AdGuardHome.new.txt
 
-      - name: Show Rules Stats in Actions Log
+      - name: Show Rules Stats
         run: |
           echo "================= AdGuardHome Rules Update ================="
           echo "总规则数: ${{ env.total_rules }}"
           echo "新增规则数: ${{ env.new_rules }}"
-          echo "新增规则（最多前100条）:"
-          head -n 100000000000 dist/AdGuardHome.new.txt
+          head -n 100000000000000000 dist/AdGuardHome.new.txt
           echo "============================================================"
