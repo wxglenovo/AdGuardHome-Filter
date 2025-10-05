@@ -82,6 +82,9 @@ jobs:
           # 计算规则条数
           rule_count=$(wc -l < tmp/merged.txt)
 
+          # 设置 Release tag 环境变量
+          echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
+
           # 生成最终规则文件，头部加生成信息
           {
             echo "! ======================================="
@@ -130,7 +133,7 @@ jobs:
         if: success() && steps.diff.outputs.diff_count != '0'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: rules-$(date +'%Y-%m-%d')
+          tag_name: ${{ env.RELEASE_TAG }}
           name: "规则更新 - ${{ env.new_count }} 条"
           body: |
             本次更新共新增 **${{ env.diff_count }}** 条规则  
