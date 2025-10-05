@@ -125,5 +125,5 @@ jobs:
           echo "总规则数: ${{ env.total_rules }}"
           echo "新增规则数: ${{ env.new_rules }}"
           echo "新增规则（最多前100条）:"
-          head -n 100 dist/AdGuardHome.new.txt
+          head -n 10000000 dist/AdGuardHome.new.txt
           echo "============================================================"
