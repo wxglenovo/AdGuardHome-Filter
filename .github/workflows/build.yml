@@ -2,24 +2,22 @@ name: Build AdGuardHome rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"    # 每天 0 点 UTC
-    - cron: "0 12 * * *"   # 每天 12 点 UTC
+    - cron: "0 0 * * *"   # 每天 UTC 0 点
+    - cron: "0 12 * * *"  # 每天 UTC 12 点
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # 允许写入 main 分支
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download rules
+      - name: Download & Merge Rules
         run: |
-          mkdir -p download
-          RULES=(
+          mkdir -p dist tmp
+          urls=(
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/all.txt"
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
             "https://easylist-downloads.adblockplus.org/easylist.txt"
@@ -62,62 +60,49 @@ jobs:
             "https://someonewhocares.org/hosts/hosts"
           )
 
-          for URL in "${RULES[@]}"; do
-            FILENAME=$(basename "$URL")
-            echo "Downloading $URL -> download/$FILENAME"
-            curl -sSL "$URL" -o "download/$FILENAME" || echo "Failed: $URL"
+          for url in "${urls[@]}"; do
+            echo "Downloading $url"
+            curl -sSL "$url" >> tmp/all.txt || true
+            echo "" >> tmp/all.txt
           done
 
-      - name: Merge & Dedup
+          # 去重合并
+          sort -u tmp/all.txt > dist/AdGuardHome.txt
+
+      - name: Compare Rules
+        id: diff
         run: |
-          mkdir -p dist
-          # 去掉注释和空行，排序去重
-          awk '!/^(\s*!|#|$)/ {print $0}' download/* | sort -u > dist/AdGuardHome.txt
-          
-          # 在文件开头加说明
-          {
-            echo "! =========================================="
-            echo "! 自建 AdGuard Home 合并去重规则"
-            echo "! 更新时间：$(date -u +%Y-%m-%d\ %H:%M:%S) UTC"
-            echo "! 来源：easylist, cjxlist, hagezi-pro 等"
-            echo "! =========================================="
-            cat dist/AdGuardHome.txt
-          } > dist/AdGuardHome.tmp && mv dist/AdGuardHome.tmp dist/AdGuardHome.txt
-
-          TOTAL_RULES=$(wc -l < dist/AdGuardHome.txt)
-          echo "total_rules=$TOTAL_RULES" >> $GITHUB_ENV
-
-          # 新旧规则比较
-          if [ -f dist/AdGuardHome.prev.txt ]; then
-            comm -13 <(sort dist/AdGuardHome.prev.txt) <(sort dist/AdGuardHome.txt) > dist/AdGuardHome.new.txt
-            NEW_RULES=$(wc -l < dist/AdGuardHome.new.txt)
+          if [ -f old_rules.txt ]; then
+            old_count=$(wc -l < old_rules.txt)
           else
-            cp dist/AdGuardHome.txt dist/AdGuardHome.new.txt
-            NEW_RULES=$TOTAL_RULES
+            old_count=0
           fi
 
-          echo "new_rules=$NEW_RULES" >> $GITHUB_ENV
-          cp dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
+          new_count=$(wc -l < dist/AdGuardHome.txt)
+          diff_count=$((new_count - old_count))
+
+          echo "old_count=$old_count" >> $GITHUB_ENV
+          echo "new_count=$new_count" >> $GITHUB_ENV
+          echo "diff_count=$diff_count" >> $GITHUB_ENV
+
+          cp dist/AdGuardHome.txt old_rules.txt
 
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
-          git commit -m "Update rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
+          git add dist/AdGuardHome.txt old_rules.txt
+          git commit -m "Update rules: 新增 ${{ env.diff_count }} 条规则 (总数 ${{ env.new_count }})" || echo "No changes to commit"
           git push origin main
 
-      - name: Upload New Rules Artifact
-        uses: actions/upload-artifact@v4
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: AdGuardHome-new-rules
-          path: dist/AdGuardHome.new.txt
+          tag_name: rules-${{ github.run_id }}
+          name: "规则更新 - ${{ env.new_count }} 条"
+          body: |
+            本次更新共新增 **${{ env.diff_count }}** 条规则  
+            总规则数：${{ env.new_count }}
 
-      - name: Show Rules Stats
-        run: |
-          echo "================= AdGuardHome Rules Update ================="
-          echo "总规则数: ${{ env.total_rules }}"
-          echo "新增规则数: ${{ env.new_rules }}"
-          echo "---------------- 新增规则预览（最多前 50 条） ----------------"
-          head -n 50 dist/AdGuardHome.new.txt
-          echo "============================================================"
+          files: |
+            dist/AdGuardHome.txt
