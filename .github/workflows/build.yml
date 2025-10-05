@@ -94,7 +94,7 @@ jobs:
 
       - name: Create Pull Request
         id: create_pr
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "Update rules $(date -u +%Y-%m-%d)"
@@ -108,15 +108,17 @@ jobs:
 
             **新增规则预览（最多 100 条）：**  
             ```  
-            $(head -n 100000000 dist/AdGuardHome.new.txt)  
+            $(head -n 100000000000 dist/AdGuardHome.new.txt)  
             ```
 
       - name: Auto Merge PR
-        uses: peter-evans/merge-pull-request@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ steps.create_pr.outputs.pull-request-number }}
-          merge-method: merge
+        run: |
+          PR_NUMBER=$(gh pr list --state open --head update-rules --json number -q '.[0].number')
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr merge "$PR_NUMBER" --merge --auto --admin
+          else
+            echo "No open PR found to merge."
+          fi
 
       - name: Upload New Rules Artifact
         uses: actions/upload-artifact@v4
@@ -130,5 +132,5 @@ jobs:
           echo "总规则数: ${{ env.total_rules }}"
           echo "新增规则数: ${{ env.new_rules }}"
           echo "新增规则（最多前100条）:"
-          head -n 100000000 dist/AdGuardHome.new.txt
+          head -n 100000000000 dist/AdGuardHome.new.txt
           echo "============================================================"
