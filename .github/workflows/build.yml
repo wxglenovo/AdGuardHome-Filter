@@ -69,14 +69,29 @@ jobs:
             "https://someonewhocares.org/hosts/hosts"
           )
 
+          # 下载规则
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL "$url" >> tmp/all.txt || true
+            curl -sSL --retry 3 "$url" >> tmp/all.txt || echo "Failed $url"
             echo "" >> tmp/all.txt
           done
 
-          # 去重合并
-          sort -u tmp/all.txt > dist/AdGuardHome.txt
+          # 去掉空行和 ! 注释行，去重
+          grep -v '^$' tmp/all.txt | grep -v '^!' | sort -u > tmp/merged.txt
+
+          # 计算规则条数
+          rule_count=$(wc -l < tmp/merged.txt)
+
+          # 生成最终规则文件，头部加生成信息
+          {
+            echo "! ======================================="
+            echo "! AdGuardHome Rules"
+            echo "! Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "! Total rules: $rule_count"
+            echo "! ======================================="
+            echo ""
+            cat tmp/merged.txt
+          } > dist/AdGuardHome.txt
 
       - name: Compare Rules
         id: diff
@@ -93,6 +108,7 @@ jobs:
           echo "old_count=$old_count" >> $GITHUB_ENV
           echo "new_count=$new_count" >> $GITHUB_ENV
           echo "diff_count=$diff_count" >> $GITHUB_ENV
+          echo "::set-output name=diff_count::$diff_count"
 
           cp dist/AdGuardHome.txt old_rules.txt
 
