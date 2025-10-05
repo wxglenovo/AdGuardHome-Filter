@@ -74,3 +74,5 @@ Release 名称包含总规则数，Body 描述新增条数。
 自动提交 & Release：新增规则自动提交、创建 Release，方便同步更新。
 
 GitHub Release tag 合法，避免创建失败。
+<img width="1024" height="1536" alt="image" src="https://github.com/user-attachments/assets/9daab83e-aeef-40fe-856a-636d59b1a60d" />
+
