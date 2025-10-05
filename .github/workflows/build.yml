@@ -2,9 +2,9 @@ name: Build AdGuardHome rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"     # 每天 0 点 UTC（北京时间早上 8 点）
-    - cron: "0 12 * * *"    # 每天 12 点 UTC（北京时间晚上 8 点）
-  workflow_dispatch:         # 支持手动触发
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,7 +17,6 @@ jobs:
       - name: Download rules
         run: |
           mkdir -p download
-          # 定义规则源列表
           RULES=(
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/all.txt"
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
@@ -70,10 +69,7 @@ jobs:
       - name: Merge & Dedup
         run: |
           mkdir -p dist
-          # 合并去重，过滤注释和空行
           awk '!/^(\s*!|#|$)/ {print $0}' download/* | sort -u > dist/AdGuardHome.txt
-
-          # 添加文件头部说明
           {
             echo "! =========================================="
             echo "! 自建 AdGuard Home 合并去重规则"
@@ -83,13 +79,53 @@ jobs:
             cat dist/AdGuardHome.txt
           } > dist/AdGuardHome.tmp && mv dist/AdGuardHome.tmp dist/AdGuardHome.txt
 
-      - name: Commit & Push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 统计总规则数
+          TOTAL_RULES=$(wc -l < dist/AdGuardHome.txt)
+          echo "total_rules=$TOTAL_RULES" >> $GITHUB_ENV
+
+          # 统计新增规则并保存高亮
+          if [ -f dist/AdGuardHome.prev.txt ]; then
+            comm -13 <(sort dist/AdGuardHome.prev.txt) <(sort dist/AdGuardHome.txt) > dist/AdGuardHome.new.txt
+            NEW_RULES=$(wc -l < dist/AdGuardHome.new.txt)
+          else
+            cp dist/AdGuardHome.txt dist/AdGuardHome.new.txt
+            NEW_RULES=$TOTAL_RULES
+          fi
+          echo "new_rules=$NEW_RULES" >> $GITHUB_ENV
+          cp dist/AdGuardHome.txt dist/AdGuardHome.prev.txt
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        id: cpr
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update rules $(date -u +%Y-%m-%d)"
+          branch: update-rules
+          base: main
+          title: "Update AdGuard Home rules $(date -u +%Y-%m-%d)"
+          body: |
+            自动合并更新规则  
+            **总规则数**: ${{ env.total_rules }}  
+            **新增规则数**: ${{ env.new_rules }}  
+
+            **新增规则预览**（仅部分，最多 100 条）：  
+            ```  
+            $(head -n 100 dist/AdGuardHome.new.txt)  
+            ```
+
+      - name: Merge Pull Request
+        if: steps.cpr.outputs.pull-request-number != ''
+        uses: actions-ecosystem/action-pull-request@v2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pull_request_number: ${{ steps.cpr.outputs.pull-request-number }}
+          merge_method: merge
+
+      - name: Show Rules Stats in Actions Log
         run: |
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add dist/AdGuardHome.txt
-          git commit -m "Update rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
-          # 使用 GITHUB_TOKEN 推送
-          git push "https://${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" HEAD:main
+          echo "================= AdGuardHome Rules Update ================="
+          echo "总规则数: ${{ env.total_rules }}"
+          echo "新增规则数: ${{ env.new_rules }}"
+          echo "新增规则（最多前100条）:"
+          head -n 100 dist/AdGuardHome.new.txt
+          echo "============================================================"
