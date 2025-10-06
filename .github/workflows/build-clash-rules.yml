@@ -2,12 +2,12 @@ name: Build Clash Rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"     # 每天 UTC 0 点
-    - cron: "0 12 * * *"    # 每天 UTC 12 点
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
   workflow_dispatch:
 
 permissions:
-  contents: write   # 必须，否则无法 push 或创建 Release
+  contents: write
 
 jobs:
   build:
@@ -23,25 +23,28 @@ jobs:
           urls=(
             "https://raw.githubusercontent.com/DivineEngine/Profiles/master/Clash/Rules/adblock.txt"
             "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt"
-            # 可添加自定义规则源
+            "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml"
+            "https://raw.githubusercontent.com/REIJI007/AdBlock_Rule_For_Clash/main/adblock_reject.yaml"
+            "https://anti-ad.net/clash.yaml"
+            "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanEasyList.yaml"
+            "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanEasyListChina.yaml"
+            "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanEasyPrivacy.yaml"
+            "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanProgramAD.yaml"
+            "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml"
           )
 
-          # 下载规则
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 "$url" >> tmp/all.txt || echo "Failed $url"
             echo "" >> tmp/all.txt
           done
 
-          # 去掉空行和注释行，去重
           grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
 
-          # 分类型生成
           grep -E '^DOMAIN-SUFFIX' tmp/merged.txt | sort -u > dist/domain-suffix.txt
           grep -E '^DOMAIN-KEYWORD' tmp/merged.txt | sort -u > dist/domain-keyword.txt
           grep -E '^DOMAIN,' tmp/merged.txt | sort -u > dist/domain.txt
 
-          # 生成 YAML 文件并添加头部信息
           for type in domain-suffix domain-keyword domain; do
             OUTPUT="dist/${type}.yaml"
             {
@@ -55,7 +58,6 @@ jobs:
             cat dist/${type}.txt >> $OUTPUT
           done
 
-          # 生成完整合并 YAML
           OUTPUT="dist/merged-clash.yaml"
           {
             echo "# =========================================="
@@ -67,7 +69,6 @@ jobs:
           } > $OUTPUT
           cat dist/domain-suffix.txt dist/domain-keyword.txt dist/domain.txt >> $OUTPUT
 
-          # 设置 Release tag
           echo "RELEASE_TAG=clash-rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
 
       - name: Commit & Push
@@ -80,7 +81,6 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Update Clash rules: $(date -u '+%Y-%m-%d')"
-            # 使用 PAT 安全推送
             git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
             git push origin main
           fi
