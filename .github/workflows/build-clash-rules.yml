@@ -2,8 +2,8 @@ name: Build Clash Rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 12 * * *"
+    - cron: "0 0 * * *"    # 每天 UTC 0 点
+    - cron: "0 12 * * *"   # 每天 UTC 12 点
   workflow_dispatch:
 
 permissions:
@@ -17,12 +17,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules
+      - name: Download & Merge Clash YAML Rules
         run: |
           mkdir -p dist tmp
           urls=(
-            "https://raw.githubusercontent.com/DivineEngine/Profiles/master/Clash/Rules/adblock.txt"
-            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt"
             "https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Clash.yaml"
             "https://raw.githubusercontent.com/REIJI007/AdBlock_Rule_For_Clash/main/adblock_reject.yaml"
             "https://anti-ad.net/clash.yaml"
@@ -33,49 +31,21 @@ jobs:
             "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml"
           )
 
+          > tmp/merged.yaml
           for url in "${urls[@]}"; do
-            echo "Downloading $url"
-            curl -sSL --retry 3 "$url" >> tmp/all.txt || echo "Failed $url"
-            echo "" >> tmp/all.txt
+            echo "# ===== 来源: $url =====" >> tmp/merged.yaml
+            curl -sSL --retry 3 "$url" >> tmp/merged.yaml || echo "Failed $url"
+            echo "" >> tmp/merged.yaml
           done
 
-          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
-
-          grep -E '^DOMAIN-SUFFIX' tmp/merged.txt | sort -u > dist/domain-suffix.txt
-          grep -E '^DOMAIN-KEYWORD' tmp/merged.txt | sort -u > dist/domain-keyword.txt
-          grep -E '^DOMAIN,' tmp/merged.txt | sort -u > dist/domain.txt
-
-          for type in domain-suffix domain-keyword domain; do
-            OUTPUT="dist/${type}.yaml"
-            {
-              echo "# =========================================="
-              echo "# Clash 广告规则 - ${type}"
-              echo "# Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
-              echo "# Total rules: $(wc -l < dist/${type}.txt)"
-              echo "# =========================================="
-              echo ""
-            } > $OUTPUT
-            cat dist/${type}.txt >> $OUTPUT
-          done
-
-          OUTPUT="dist/merged-clash.yaml"
-          {
-            echo "# =========================================="
-            echo "# Clash 广告规则 - 全部合并"
-            echo "# Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
-            echo "# Total rules: $(wc -l < tmp/merged.txt)"
-            echo "# =========================================="
-            echo ""
-          } > $OUTPUT
-          cat dist/domain-suffix.txt dist/domain-keyword.txt dist/domain.txt >> $OUTPUT
-
+          cp tmp/merged.yaml dist/merged-clash.yaml
           echo "RELEASE_TAG=clash-rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
 
       - name: Commit & Push
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add dist/*.yaml
+          git add dist/merged-clash.yaml
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
@@ -95,16 +65,12 @@ jobs:
           name: "Clash 规则更新"
           body: "本次规则自动生成更新"
           files: |
-            dist/domain-suffix.yaml
-            dist/domain-keyword.yaml
-            dist/domain.yaml
             dist/merged-clash.yaml
 
       - name: Show Rules Stats
         run: |
+          total_lines=$(wc -l < dist/merged-clash.yaml)
           echo "================= Clash Rules Stats ================="
-          echo "DOMAIN-SUFFIX: $(wc -l < dist/domain-suffix.txt)"
-          echo "DOMAIN-KEYWORD: $(wc -l < dist/domain-keyword.txt)"
-          echo "DOMAIN: $(wc -l < dist/domain.txt)"
-          echo "Merged total: $(wc -l < dist/merged-clash.yaml)"
+          echo "Merged total lines: $total_lines"
+          head -n 20 dist/merged-clash.yaml
           echo "====================================================="
