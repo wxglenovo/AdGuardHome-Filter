@@ -38,9 +38,12 @@ jobs:
             echo "" >> tmp/merged.txt
           done
 
-          # 去掉行首空格，去掉注释行，仅保留规则行，并去重
-          sed 's/^[[:space:]]*//' tmp/merged.txt | \
-          grep -E '^(DOMAIN-SUFFIX|DOMAIN-KEYWORD|DOMAIN|IP-CIDR|IP-CIDR6),' | sort -u > tmp/unique-rules.txt
+          # 处理规则：去掉行首空格、破折号、前后引号，去掉注释行，只保留规则行，并去重
+          sed 's/^[[:space:]]*-\s*//' tmp/merged.txt | \
+          sed "s/^['\"]//;s/['\"]$//" | \
+          grep -Ev '^\s*#' | \
+          grep -E '^(DOMAIN-SUFFIX|DOMAIN-KEYWORD|DOMAIN|IP-CIDR|IP-CIDR6),' | \
+          sort -u > tmp/unique-rules.txt
 
           total_rules=$(wc -l < tmp/unique-rules.txt)
 
