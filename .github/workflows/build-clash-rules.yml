@@ -33,14 +33,15 @@ jobs:
 
           > tmp/merged.txt
           for url in "${urls[@]}"; do
+            echo "Downloading $url"
             curl -sSL --retry 3 "$url" >> tmp/merged.txt || echo "Failed $url"
             echo "" >> tmp/merged.txt
           done
 
-          # 只保留规则行并去重
-          grep -E '^(DOMAIN-SUFFIX|DOMAIN-KEYWORD|DOMAIN|IP-CIDR|IP-CIDR6),' tmp/merged.txt | sort -u > tmp/unique-rules.txt
+          # 去掉行首空格，去掉注释行，仅保留规则行，并去重
+          sed 's/^[[:space:]]*//' tmp/merged.txt | \
+          grep -E '^(DOMAIN-SUFFIX|DOMAIN-KEYWORD|DOMAIN|IP-CIDR|IP-CIDR6),' | sort -u > tmp/unique-rules.txt
 
-          # 规则总数
           total_rules=$(wc -l < tmp/unique-rules.txt)
 
           # 输出最终 YAML，添加头部信息
