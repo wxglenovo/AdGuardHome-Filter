@@ -2,8 +2,8 @@ name: Build Clash Rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"    # 每天 UTC 0 点
-    - cron: "0 12 * * *"   # 每天 UTC 12 点
+    - cron: "0 0 * * *"
+    - cron: "0 12 * * *"
   workflow_dispatch:
 
 permissions:
@@ -31,14 +31,30 @@ jobs:
             "https://hub.gitmirror.com/raw.githubusercontent.com/ACL4SSR/ACL4SSR/master/Clash/Providers/BanAD.yaml"
           )
 
-          > tmp/merged.yaml
+          > tmp/merged.txt
           for url in "${urls[@]}"; do
-            echo "# ===== 来源: $url =====" >> tmp/merged.yaml
-            curl -sSL --retry 3 "$url" >> tmp/merged.yaml || echo "Failed $url"
-            echo "" >> tmp/merged.yaml
+            curl -sSL --retry 3 "$url" >> tmp/merged.txt || echo "Failed $url"
+            echo "" >> tmp/merged.txt
           done
 
-          cp tmp/merged.yaml dist/merged-clash.yaml
+          # 只保留规则行并去重
+          grep -E '^(DOMAIN-SUFFIX|DOMAIN-KEYWORD|DOMAIN|IP-CIDR|IP-CIDR6),' tmp/merged.txt | sort -u > tmp/unique-rules.txt
+
+          # 规则总数
+          total_rules=$(wc -l < tmp/unique-rules.txt)
+
+          # 输出最终 YAML，添加头部信息
+          OUTPUT="dist/merged-clash.yaml"
+          {
+            echo "# ======================================="
+            echo "# Clash Rules - 自动生成"
+            echo "# 生成时间: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "# 规则总数: $total_rules"
+            echo "# ======================================="
+            echo ""
+            cat tmp/unique-rules.txt
+          } > $OUTPUT
+
           echo "RELEASE_TAG=clash-rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
 
       - name: Commit & Push
@@ -63,14 +79,13 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "Clash 规则更新"
-          body: "本次规则自动生成更新"
+          body: "本次规则自动生成更新，总规则数: $total_rules"
           files: |
             dist/merged-clash.yaml
 
       - name: Show Rules Stats
         run: |
-          total_lines=$(wc -l < dist/merged-clash.yaml)
           echo "================= Clash Rules Stats ================="
-          echo "Merged total lines: $total_lines"
+          echo "Merged total rules: $total_rules"
           head -n 20 dist/merged-clash.yaml
           echo "====================================================="
