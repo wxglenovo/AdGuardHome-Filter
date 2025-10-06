@@ -2,82 +2,109 @@ name: Build Clash Rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"     # 每天 0 点 UTC（北京时间早上 8 点）
-    - cron: "0 12 * * *"    # 每天 12 点 UTC（北京时间晚上 8 点）
-  workflow_dispatch:         # 支持手动触发
+    - cron: "0 0 * * *"     # 每天 UTC 0 点
+    - cron: "0 12 * * *"    # 每天 UTC 12 点
+  workflow_dispatch:
+
+permissions:
+  contents: write   # 必须，否则无法 push 或创建 Release
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 检出仓库
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2️⃣ 下载规则源
-      - name: Download rules
+      - name: Download & Merge Rules
         run: |
-          mkdir -p download
-          echo "🔽 下载规则..."
-          curl -sSL --retry 5 https://raw.githubusercontent.com/DivineEngine/Profiles/master/Clash/Rules/adblock.txt > download/adblock.txt
-          curl -sSL --retry 5 https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt > download/hagezi-pro.txt
-          # 可添加自定义规则源
-          # curl -sSL --retry 5 https://raw.githubusercontent.com/你的用户名/AdGuardHome-Filter/main/myrules.txt > download/myrules.txt
+          mkdir -p dist tmp
+          urls=(
+            "https://raw.githubusercontent.com/DivineEngine/Profiles/master/Clash/Rules/adblock.txt"
+            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/pro.txt"
+            # 可添加自定义规则源
+          )
 
-      # 3️⃣ 分类型合并去重
-      - name: Merge & Dedup
-        run: |
-          echo "⚡ 分类型去重..."
-          mkdir -p dist
+          # 下载规则
+          for url in "${urls[@]}"; do
+            echo "Downloading $url"
+            curl -sSL --retry 3 "$url" >> tmp/all.txt || echo "Failed $url"
+            echo "" >> tmp/all.txt
+          done
 
-          # 分类型去重
-          grep -E '^DOMAIN-SUFFIX' download/*.txt | sort -u > dist/domain-suffix.txt
-          grep -E '^DOMAIN-KEYWORD' download/*.txt | sort -u > dist/domain-keyword.txt
-          grep -E '^DOMAIN,' download/*.txt | sort -u > dist/domain.txt
+          # 去掉空行和注释行，去重
+          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
 
-          # 生成单独 YAML 文件
+          # 分类型生成
+          grep -E '^DOMAIN-SUFFIX' tmp/merged.txt | sort -u > dist/domain-suffix.txt
+          grep -E '^DOMAIN-KEYWORD' tmp/merged.txt | sort -u > dist/domain-keyword.txt
+          grep -E '^DOMAIN,' tmp/merged.txt | sort -u > dist/domain.txt
+
+          # 生成 YAML 文件并添加头部信息
           for type in domain-suffix domain-keyword domain; do
             OUTPUT="dist/${type}.yaml"
             {
               echo "# =========================================="
-              echo "# Clash 广告过滤规则 - ${type}"
-              echo "# 更新时间: $(date -u +%Y-%m-%d %H:%M:%S) UTC"
-              echo "# 来源: adblock, hagezi-pro 等"
+              echo "# Clash 广告规则 - ${type}"
+              echo "# Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
+              echo "# Total rules: $(wc -l < dist/${type}.txt)"
               echo "# =========================================="
               echo ""
             } > $OUTPUT
             cat dist/${type}.txt >> $OUTPUT
-            echo "✅ 生成文件: $OUTPUT"
           done
 
-          # 生成完整合并文件
+          # 生成完整合并 YAML
           OUTPUT="dist/merged-clash.yaml"
           {
             echo "# =========================================="
-            echo "# Clash 广告过滤规则 - 全部合并"
-            echo "# 更新时间: $(date -u +%Y-%m-%d %H:%M:%S) UTC"
-            echo "# 来源: adblock, hagezi-pro 等"
+            echo "# Clash 广告规则 - 全部合并"
+            echo "# Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "# Total rules: $(wc -l < tmp/merged.txt)"
             echo "# =========================================="
             echo ""
           } > $OUTPUT
           cat dist/domain-suffix.txt dist/domain-keyword.txt dist/domain.txt >> $OUTPUT
-          echo "✅ 生成文件: $OUTPUT"
 
-      # 4️⃣ Commit & Push（使用 PAT）
+          # 设置 Release tag
+          echo "RELEASE_TAG=clash-rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
+
       - name: Commit & Push
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add dist/*.yaml
-          git commit -m "Update Clash rules $(date -u +%Y-%m-%d)" || echo "No changes to commit"
 
-          # 使用 PAT 推送
-          git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/wxglenovo/clash-ad-rules.git
-          git push origin main
-
-          # 自动打 tag
-          git tag -fa "clash-rules-$(date -u +%Y-%m-%d)" -m "Clash rules updated $(date -u +%Y-%m-%d)"
-          git push origin --tags
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update Clash rules: $(date -u '+%Y-%m-%d')"
+            # 使用 PAT 安全推送
+            git remote set-url origin https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/${{ github.repository }}.git
+            git push origin main
+          fi
         env:
           PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "Clash 规则更新"
+          body: "本次规则自动生成更新"
+          files: |
+            dist/domain-suffix.yaml
+            dist/domain-keyword.yaml
+            dist/domain.yaml
+            dist/merged-clash.yaml
+
+      - name: Show Rules Stats
+        run: |
+          echo "================= Clash Rules Stats ================="
+          echo "DOMAIN-SUFFIX: $(wc -l < dist/domain-suffix.txt)"
+          echo "DOMAIN-KEYWORD: $(wc -l < dist/domain-keyword.txt)"
+          echo "DOMAIN: $(wc -l < dist/domain.txt)"
+          echo "Merged total: $(wc -l < dist/merged-clash.yaml)"
+          echo "====================================================="
