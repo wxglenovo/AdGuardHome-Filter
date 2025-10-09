@@ -56,9 +56,7 @@ jobs:
             "https://raw.githubusercontent.com/xinggsf/Adblock-Plus-Rule/master/mv.txt"
             "https://hblock.molinero.dev/hosts_adblock.txt"
             "https://abp.oisd.nl/basic/"
-)
-
-
+          )
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all.txt || echo "Failed $url"
