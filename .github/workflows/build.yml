@@ -1,4 +1,4 @@
-name: Build AdGuardHome rules (Router Version)
+name: Build AdGuardHome rules
 
 on:
   schedule:
@@ -42,21 +42,23 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          echo "🧹 清理规则，只保留对路由器有效的域名屏蔽规则..."
-          # 删除空行、注释、CSS选择器规则、客户端专用规则、正则复杂规则
-          grep -vE '(^!|^$|##|^\|\|\.(advert|adver)|^\|/|^\$\w+|\$script|\$popup|\$subdocument|\$frame)' tmp/all.txt > tmp/merged_clean.txt
+          echo "🧹 清理注释、空行..."
+          grep -vE '(^!|^$|##)' tmp/all.txt > tmp/merged_clean.txt
 
           echo "🛠 修复 @@||@@|| → @@||"
           sed -i 's/@@||@@||/@@||/g' tmp/merged_clean.txt
 
-          echo "⚡ 删除无效 IP 规则（||||IP）..."
+          echo "⚡ 删除无效 IP 规则..."
           grep -vE '^\|\|\|\|[0-9]+\.' tmp/merged_clean.txt > tmp/merged_no_ip.txt
 
           echo "📌 分离 \$cookie 规则..."
           grep '^\$cookie' tmp/merged_no_ip.txt > tmp/cookie_rules.txt
           grep -v '^\$cookie' tmp/merged_no_ip.txt > tmp/other_rules.txt
 
-          echo "📊 对非 \$cookie 规则去重排序..."
+          echo "📝 创建软路由专用版本..."
+          # 删除网页 CSS、复杂正则和客户端专用规则
+          grep -vE '##|\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/merged_no_ip.txt > tmp/router_other.txt
+
           awk '
             /^\|\|/ { gsub(/\^.*/, "", $0); rules[$0]=1; next }
             /^@@\|\|/ { gsub(/\^.*/, "", $0); allow[$0]=1; next }
@@ -65,17 +67,16 @@ jobs:
               for (r in rules) print "||" r "^"
               for (a in allow) print "@@||" a "^"
             }
-          ' tmp/other_rules.txt | sort > tmp/final_other_rules.txt
+          ' tmp/router_other.txt | sort > tmp/final_router.txt
 
-          echo "📝 合并 \$cookie 规则和其他规则..."
-          cat tmp/cookie_rules.txt tmp/final_other_rules.txt > dist/AdGuardHome_Router.txt
+          cat tmp/cookie_rules.txt tmp/final_router.txt > dist/AdGuardHome.txt
 
           echo "📊 统计规则数量..."
-          rule_count=$(wc -l < dist/AdGuardHome_Router.txt)
-          allow_count=$(grep -c '^@@||' dist/AdGuardHome_Router.txt || true)
-          block_count=$(grep -c '^\|\|' dist/AdGuardHome_Router.txt || true)
+          rule_count=$(wc -l < dist/AdGuardHome.txt)
+          allow_count=$(grep -c '^@@||' dist/AdGuardHome.txt || true)
+          block_count=$(grep -c '^\|\|' dist/AdGuardHome.txt || true)
 
-          echo "RELEASE_TAG=rules-router-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
+          echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
@@ -83,13 +84,13 @@ jobs:
       - name: Compare Rules
         id: diff
         run: |
-          if [ -f old_rules_router.txt ]; then
-            old_count=$(wc -l < old_rules_router.txt)
+          if [ -f old_rules.txt ]; then
+            old_count=$(wc -l < old_rules.txt)
           else
             old_count=0
           fi
 
-          new_count=$(wc -l < dist/AdGuardHome_Router.txt)
+          new_count=$(wc -l < dist/AdGuardHome.txt)
           diff_count=$((new_count - old_count))
 
           echo "old_count=$old_count" >> $GITHUB_ENV
@@ -97,18 +98,18 @@ jobs:
           echo "diff_count=$diff_count" >> $GITHUB_ENV
           echo "diff_count=$diff_count" >> $GITHUB_OUTPUT
 
-          cp dist/AdGuardHome_Router.txt old_rules_router.txt
+          cp dist/AdGuardHome.txt old_rules.txt
 
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/AdGuardHome_Router.txt old_rules_router.txt
+          git add dist/AdGuardHome.txt old_rules.txt
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update router rules: 新增 ${{ env.diff_count }} 条规则 (总数 ${{ env.new_count }})"
+            git commit -m "Update rules: 新增 ${{ env.diff_count }} 条规则 (总数 ${{ env.new_count }})"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
@@ -118,22 +119,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: "路由器规则更新 - ${{ env.new_count }} 条"
+          name: "路由器专用规则更新 - ${{ env.new_count }} 条"
           body: |
             本次规则更新：
-            - 新增：**${{ env.diff_count }}** 条  
             - 总数：${{ env.new_count }}  
             - 阻止规则：${{ env.BLOCK_COUNT }}  
             - 放行规则：${{ env.ALLOW_COUNT }}
           files: |
-            dist/AdGuardHome_Router.txt
+            dist/AdGuardHome.txt
 
       - name: Show Rules Stats
         run: |
-          echo "================= ✅ AdGuardHome Router Rules Build ================="
-          echo "总规则数: ${{ env.RULE_COUNT }}"
-          echo "新增规则数: ${{ env.diff_count }}"
-          echo "阻止规则数: ${{ env.BLOCK_COUNT }}"
-          echo "放行规则数: ${{ env.ALLOW_COUNT }}"
+          echo "================= ✅ 路由器专用 AdGuardHome Rules Build ================="
+          echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }})"
           echo "============================================================"
-          head -n 50 dist/AdGuardHome_Router.txt
+          head -n 50 dist/AdGuardHome.txt
