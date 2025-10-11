@@ -1,9 +1,11 @@
-name: Build Clean AdGuardHome Rules
+name: Build AdGuardHome rules
 
 on:
   schedule:
     - cron: "0 0 * * *"
+    - cron: "0 6 * * *"
     - cron: "0 12 * * *"
+    - cron: "0 18 * * *"
   workflow_dispatch:
 
 permissions:
@@ -39,63 +41,39 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          echo "🧹 清理规则..."
-          # 删除空行和注释
-          grep -v '^$' tmp/all.txt | grep -v '^[!#]' > tmp/merged.txt
-          # 修正 @@||@@|| → @@||
-          sed -i 's/^@@||@@||/@@||/' tmp/merged.txt
+          echo "🧹 清理空行和注释..."
+          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
 
           echo "⚡ 保留指定 $cookie 规则..."
-          grep -E '^\$cookie=/^_gd/|^\$cookie=/^_hjSessionUser_|^\$cookie=/^_hjSession_|^\$cookie=/^_v__chartbeat/|^\$cookie=/^_ym_visorc/|^\$cookie=/^adb\$|adb\.key/|^\$cookie=/^adptset_\d+/|^\$cookie=/^amplitude_id_/|^\$cookie=/^evid_\d+/|^\$cookie=/^evid_set_\d+/|^\$cookie=/^ezoadgid_/|^\$cookie=/^ezopvc_/|^\$cookie=/^ezoref_/|^\$cookie=/^ezovuuid_/|^\$cookie=/^ezovuuidtime_/|^\$cookie=/^ezux_et_/|^\$cookie=/^ezux_ifep/|^\$cookie=/^ezux_lpl_/|^\$cookie=/^ezux_tos_/|^\$cookie=/^mprtcl-prodv4_/' tmp/merged.txt > tmp/cookie_rules.txt
+          grep -E '(^\$cookie=/^_gd/|^\$cookie=/^_hjSessionUser_|^\$cookie=/^_hjSession_|^\$cookie=/^_v__chartbeat/|^\$cookie=/^_ym_visorc/|^\$cookie=/^adb\$|adb\.key/|^\$cookie=/^adptset_[0-9]+/|^\$cookie=/^amplitude_id_/|^\$cookie=/^evid_[0-9]+/|^\$cookie=/^evid_set_[0-9]+/|^\$cookie=/^ezoadgid_/|^\$cookie=/^ezopvc_/|^\$cookie=/^ezoref_/|^\$cookie=/^ezovuuid_/|^\$cookie=/^ezovuuidtime_/|^\$cookie=/^ezux_et_/|^\$cookie=/^ezux_ifep/|^\$cookie=/^ezux_lpl_/|^\$cookie=/^ezux_tos_/|^\$cookie=/^mprtcl-prodv4_/)' tmp/merged_raw.txt > tmp/cookie_rules.txt
 
-          echo "🚫 删除无效规则（元素屏蔽、JS路径、空规则 ||*^）..."
-          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$cookie=|^\|\*\^|^\|\|/\*|\*/)' tmp/merged.txt > tmp/clean_rules.txt
+          echo "🚫 删除无效规则（元素屏蔽、JS 注入、空规则、||*^ 等）..."
+          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|^\|\|\*?\^)' tmp/merged_raw.txt > tmp/clean_rules.txt
 
-          echo "⚖️ 放行规则优先 & 删除泛匹配阻止规则..."
-          awk '
-            # 放行规则
-            /^@@\|\|/ {
-              domain=$0
-              gsub(/^@@\|\|/, "", domain)
-              gsub(/\^.*/, "", domain)
-              allow[domain]=1
-              next
-            }
-            # 阻止规则
-            /^\|\|/ {
-              if ($0 !~ /^\|\*\^/) {   # 删除 ||*^ 泛匹配阻止
-                domain=$0
-                gsub(/^\|\|/, "", domain)
-                gsub(/\^.*/, "", domain)
-                block[domain]=1
-              }
-              next
-            }
-            { print > "tmp/other_rules.txt" }
-            END {
-              # 输出阻止规则（未被放行覆盖的）
-              for (d in block) if (!(d in allow)) print "||" d "^" > "tmp/final_rules.txt"
-              # 输出放行规则
-              for (d in allow) print "@@||" d "^" > "tmp/final_rules.txt"
-              # 添加其他规则
-              system("cat tmp/other_rules.txt >> tmp/final_rules.txt")
-            }
-          ' tmp/clean_rules.txt
+          echo "📦 合并 cookie 和其它规则..."
+          cat tmp/cookie_rules.txt tmp/clean_rules.txt | sort -u > tmp/merged_clean.txt
 
-          echo "🔹 合并 cookie 规则..."
-          cat tmp/cookie_rules.txt >> tmp/final_rules.txt
-
-          # 去重 & 按域名排序
-          sort -u tmp/final_rules.txt > dist/AdGuardHome.txt
-
-          rule_count=$(wc -l < dist/AdGuardHome.txt)
-          allow_count=$(grep -c '^@@||' dist/AdGuardHome.txt || true)
-          block_count=$(grep -E -c '^\|\|' dist/AdGuardHome.txt || true)
+          echo "📊 统计规则数量..."
+          rule_count=$(wc -l < tmp/merged_clean.txt)
+          allow_count=$(grep -c '^@@||' tmp/merged_clean.txt || true)
+          block_count=$(grep -E -c '^\|\|' tmp/merged_clean.txt || true)
 
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
+
+          {
+            echo "! ======================================="
+            echo "! ✅ AdGuardHome Rules (Auto Build)"
+            echo "! Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo "! Total rules: $rule_count"
+            echo "! Block rules: $block_count"
+            echo "! Allow rules: $allow_count"
+            echo "! ======================================="
+            echo ""
+            cat tmp/merged_clean.txt
+          } > dist/AdGuardHome.txt
 
       - name: Compare Rules
         id: diff
@@ -105,12 +83,15 @@ jobs:
           else
             old_count=0
           fi
+
           new_count=$(wc -l < dist/AdGuardHome.txt)
           diff_count=$((new_count - old_count))
+
           echo "old_count=$old_count" >> $GITHUB_ENV
           echo "new_count=$new_count" >> $GITHUB_ENV
           echo "diff_count=$diff_count" >> $GITHUB_ENV
           echo "diff_count=$diff_count" >> $GITHUB_OUTPUT
+
           cp dist/AdGuardHome.txt old_rules.txt
 
       - name: Commit & Push
@@ -118,6 +99,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add dist/AdGuardHome.txt old_rules.txt
+
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
@@ -140,8 +122,9 @@ jobs:
             - 放行规则：${{ env.ALLOW_COUNT }}  
 
             本规则专为 **AdGuard Home** 优化：
-            - 🚫 已删除泛匹配阻止规则 `||*^`
-            - ✅ 保留指定 cookie 规则、放行优先，运行更快更稳定
+            - 🚫 已移除页面元素屏蔽、JS 注入、空规则 (`||*^`)  
+            - ✅ 保留指定 $cookie 规则  
+            - ⚡ 规则按域名排序，运行更快更稳定
           files: |
             dist/AdGuardHome.txt
 
