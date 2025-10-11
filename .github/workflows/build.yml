@@ -16,9 +16,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout repository
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Step 2: 下载与合并规则
       - name: Download & Merge Rules
         run: |
           mkdir -p dist tmp
@@ -44,36 +46,11 @@ jobs:
           echo "🧹 清理与合并..."
           grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
 
-          echo "🚫 删除无效规则（元素屏蔽、Cookie、空规则、||^ 等）..."
-          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$cookie=|^\|\|\^)' tmp/merged_raw.txt > tmp/merged_clean.txt
+          echo "🚫 删除无效规则（元素屏蔽、Cookie、空规则、||^、||*^）..."
+          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$cookie=|^\|\|\^|^\|\|\*\^)' tmp/merged_raw.txt > tmp/final_rules_unsorted.txt
 
-          echo "⚖️ 检查并移除相互抵消规则..."
-          awk '
-            /^@@\|\|/ {
-              domain=$0
-              gsub(/^@@\|\|/, "", domain)
-              gsub(/\^.*/, "", domain)
-              allow[domain]=1
-              next
-            }
-            /^\|\|/ {
-              domain=$0
-              gsub(/^\|\|/, "", domain)
-              gsub(/\^.*/, "", domain)
-              block[domain]=1
-              next
-            }
-            { print > "tmp/other_rules.txt" }
-            END {
-              for (d in block) {
-                if (!(d in allow)) print "||" d "^" > "tmp/final_rules.txt"
-              }
-              for (d in allow) {
-                if (!(d in block)) print "@@||" d "^" > "tmp/final_rules.txt"
-              }
-              system("cat tmp/other_rules.txt >> tmp/final_rules.txt")
-            }
-          ' tmp/merged_clean.txt
+          echo "📑 按域名字母顺序排列规则..."
+          sort tmp/final_rules_unsorted.txt > tmp/final_rules.txt
 
           echo "📊 统计规则数量..."
           rule_count=$(wc -l < tmp/final_rules.txt)
@@ -97,6 +74,7 @@ jobs:
             cat tmp/final_rules.txt
           } > dist/AdGuardHome.txt
 
+      # Step 3: 比较新旧规则差异
       - name: Compare Rules
         id: diff
         run: |
@@ -116,6 +94,7 @@ jobs:
 
           cp dist/AdGuardHome.txt old_rules.txt
 
+      # Step 4: 提交并推送更新
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
@@ -130,6 +109,7 @@ jobs:
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
 
+      # Step 5: 创建 Release
       - name: Create Release
         if: ${{ env.diff_count != '0' }}
         uses: softprops/action-gh-release@v2
@@ -145,11 +125,12 @@ jobs:
 
             本规则专为 **AdGuard Home** 优化：
             - 🚫 已移除页面元素屏蔽、Cookie、JS 注入、空规则 (`||^`)  
-            - ⚖️ 已自动清理互相抵消的域名规则  
-            - ✅ 保留纯 DNS 拦截，运行更快更稳定
+            - ✅ 保留纯 DNS 拦截，运行更快更稳定  
+            - 📑 规则已按域名字母排序
           files: |
             dist/AdGuardHome.txt
 
+      # Step 6: 输出规则统计信息
       - name: Show Rules Stats
         run: |
           echo "================= ✅ AdGuardHome Rules Build ================="
