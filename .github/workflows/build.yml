@@ -29,15 +29,35 @@ jobs:
             "https://raw.githubusercontent.com/sbwml/halflife-list/refs/heads/master/ad-pc.txt"
             "https://raw.githubusercontent.com/sbwml/halflife-list/refs/heads/master/ad.txt"
             "https://raw.githubusercontent.com/sbwml/halflife-list/refs/heads/master/ad2.txt"
-            "https://raw.githubusercontent.com/sbwml/halflife-list/refs/heads/master/ad3.txt"            
+            "https://raw.githubusercontent.com/sbwml/halflife-list/refs/heads/master/ad3.txt"
           )
+
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all.txt || echo "Failed $url"
             echo "" >> tmp/all.txt
           done
 
-          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
+          echo "合并并清理基础规则..."
+          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
+
+          echo "提取放行规则域名..."
+          grep '^@@||' tmp/merged_raw.txt | sed -E 's/^@@\|\|([^\/\^]+).*/\1/' > tmp/whitelist_domains.txt || true
+
+          cp tmp/merged_raw.txt tmp/merged.txt
+
+          echo "执行放行与阻止规则抵消..."
+          while read -r domain; do
+            if [ -n "$domain" ]; then
+              sed -i "/^\@\@||${domain}\^/d" tmp/merged.txt
+              sed -i "/^\|\|${domain}\^/d" tmp/merged.txt
+              echo "抵消规则：$domain"
+            fi
+          done < tmp/whitelist_domains.txt
+
+          echo "最终清理与去重..."
+          grep -v '^$' tmp/merged.txt | sort -u > tmp/merged_clean.txt
+          mv tmp/merged_clean.txt tmp/merged.txt
 
           rule_count=$(wc -l < tmp/merged.txt)
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
