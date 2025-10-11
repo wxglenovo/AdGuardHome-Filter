@@ -32,36 +32,67 @@ jobs:
             "https://raw.githubusercontent.com/sbwml/halflife-list/refs/heads/master/ad3.txt"
           )
 
+          echo "📥 下载规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all.txt || echo "Failed $url"
             echo "" >> tmp/all.txt
           done
 
-          echo "合并规则..."
+          echo "🧹 清理与合并..."
           grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
 
-          echo "清理无效规则（元素屏蔽 / 页面规则）..."
-          # 删除 AdGuard Home 不支持的页面元素屏蔽规则
-          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#)' tmp/merged_raw.txt > tmp/merged.txt
+          echo "🚫 删除无效规则（元素屏蔽、Cookie、JS 注入等）..."
+          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$cookie=)' tmp/merged_raw.txt > tmp/merged_clean.txt
 
-          rule_count=$(wc -l < tmp/merged.txt)
-          allow_count=$(grep -c '^@@||' tmp/merged.txt || true)
-          block_count=$(grep -E -c '^\|\|' tmp/merged.txt || true)
+          echo "⚖️ 检查并移除相互抵消规则..."
+          awk '
+            /^@@\|\|/ {
+              domain=$0
+              gsub(/^@@\|\|/, "", domain)
+              gsub(/\^.*/, "", domain)
+              allow[domain]=1
+              next
+            }
+            /^\|\|/ {
+              domain=$0
+              gsub(/^\|\|/, "", domain)
+              gsub(/\^.*/, "", domain)
+              block[domain]=1
+              next
+            }
+            { print > "tmp/other_rules.txt" }
+            END {
+              for (d in block) {
+                if (!(d in allow)) print "||" d "^" > "tmp/final_rules.txt"
+              }
+              for (d in allow) {
+                if (!(d in block)) print "@@||" d "^" > "tmp/final_rules.txt"
+              }
+              system("cat tmp/other_rules.txt >> tmp/final_rules.txt")
+            }
+          ' tmp/merged_clean.txt
+
+          echo "📊 统计规则数量..."
+          rule_count=$(wc -l < tmp/final_rules.txt)
+          allow_count=$(grep -c '^@@||' tmp/final_rules.txt || true)
+          block_count=$(grep -E -c '^\|\|' tmp/final_rules.txt || true)
+
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
+          echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
 
           {
             echo "! ======================================="
-            echo "! AdGuardHome Rules"
+            echo "! ✅ AdGuardHome Rules (Auto Build)"
             echo "! Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
             echo "! Total rules: $rule_count"
             echo "! Block rules: $block_count"
             echo "! Allow rules: $allow_count"
             echo "! ======================================="
             echo ""
-            cat tmp/merged.txt
+            cat tmp/final_rules.txt
           } > dist/AdGuardHome.txt
 
       - name: Compare Rules
@@ -104,17 +135,23 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "规则更新 - ${{ env.new_count }} 条"
           body: |
-            本次更新共新增 **${{ env.diff_count }}** 条规则  
-            总规则数：${{ env.new_count }}  
-            阻止规则：${{ env.BLOCK_COUNT }}  
-            放行规则：${{ env.ALLOW_COUNT }}
+            🧩 本次规则更新
+            - 新增：**${{ env.diff_count }}** 条  
+            - 总数：${{ env.new_count }}  
+            - 阻止规则：${{ env.BLOCK_COUNT }}  
+            - 放行规则：${{ env.ALLOW_COUNT }}  
+
+            本规则专为 **AdGuard Home** 优化：
+            - 🚫 已移除页面元素屏蔽、Cookie 与 JS 注入规则  
+            - ⚖️ 已自动清理互相抵消的域名规则  
+            - ✅ 保留纯 DNS 拦截，运行更快更稳定
           files: |
             dist/AdGuardHome.txt
 
       - name: Show Rules Stats
         run: |
-          echo "================= AdGuardHome Rules Update ================="
-          echo "总规则数: ${{ env.new_count }}"
+          echo "================= ✅ AdGuardHome Rules Build ================="
+          echo "总规则数: ${{ env.RULE_COUNT }}"
           echo "新增规则数: ${{ env.diff_count }}"
           echo "阻止规则数: ${{ env.BLOCK_COUNT }}"
           echo "放行规则数: ${{ env.ALLOW_COUNT }}"
