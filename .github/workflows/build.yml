@@ -1,14 +1,17 @@
 name: Build AdGuardHome rules
 
 on:
+  # 定时触发 workflow，分别每天的 0、6、12、18 点
   schedule:
     - cron: "0 0 * * *"
     - cron: "0 6 * * *"
     - cron: "0 12 * * *"
     - cron: "0 18 * * *"
+  # 支持手动触发
   workflow_dispatch:
 
 permissions:
+  # 允许写入仓库内容，用于提交更新
   contents: write
 
 jobs:
@@ -16,12 +19,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: 拉取仓库代码
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Step 2: 下载规则并合并
       - name: Download & Merge Rules
         run: |
-          mkdir -p dist tmp
+          mkdir -p dist tmp  # 创建临时目录和输出目录
+
+          # 需要下载的规则 URL 列表
           urls=(
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION.txt"
@@ -35,31 +42,53 @@ jobs:
           )
 
           echo "📥 下载规则..."
+          # 循环下载每个规则文件，失败时输出错误
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all.txt || echo "Failed $url"
-            echo "" >> tmp/all.txt
+            echo "" >> tmp/all.txt  # 每个文件之间加空行
           done
 
-          echo "🧹 清理与合并规则..."
-          # 删除空行、注释、元素屏蔽、$app、$csp、泛匹配（||*^ 或 ||^）
-          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$app|^\|\|\*?\^|^\$csp)' > tmp/merged_clean.txt
+          echo "🧹 清理注释和空行..."
+          # 删除注释行（以 ! 开头）和空行，并去重排序
+          grep -vE '(^!|^$)' tmp/all.txt | sort -u > tmp/merged_clean.txt
 
-          echo "🔗 合并现有 $cookie 规则..."
-          cat tmp/merged_clean.txt tmp/all.txt | sort -u > tmp/final_sorted.txt
+          echo "📊 按域名排序..."
+          # 对规则进行简单规范化：
+          # - 阻止规则以 || 开头，去掉 ^ 及后面的内容
+          # - 放行规则以 @@|| 开头，去掉 ^ 及后面的内容
+          # - 其它规则直接保留
+          awk '
+            # 处理阻止规则
+            /^\|\|/ { gsub(/\^.*/, "", $0); rules[$0]=1; next }
+            # 处理放行规则
+            /^@@\|\|/ { gsub(/\^.*/, "", $0); allow[$0]=1; next }
+            # 其他规则暂存
+            { rules[$0]=1 }
+            END {
+              # 输出阻止规则
+              for (r in rules) print "||" r "^"
+              # 输出放行规则
+              for (a in allow) print "@@||" a "^"
+            }
+          ' tmp/merged_clean.txt | sort > tmp/final_rules.txt
 
           echo "📊 统计规则数量..."
-          rule_count=$(wc -l < tmp/final_sorted.txt)
-          allow_count=$(grep -c '^@@||' tmp/final_sorted.txt || true)
-          block_count=$(grep -E -c '^\|\|' tmp/final_sorted.txt || true)
+          # 统计总规则数、阻止规则数和放行规则数
+          rule_count=$(wc -l < tmp/final_rules.txt)
+          allow_count=$(grep -c '^@@||' tmp/final_rules.txt || true)
+          block_count=$(grep -c '^\|\|' tmp/final_rules.txt || true)
 
+          # 写入环境变量供后续步骤使用
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
 
-          mv tmp/final_sorted.txt dist/AdGuardHome.txt
+          # 移动最终规则文件到 dist 目录
+          mv tmp/final_rules.txt dist/AdGuardHome.txt
 
+      # Step 3: 对比历史规则，计算新增数量
       - name: Compare Rules
         id: diff
         run: |
@@ -77,8 +106,10 @@ jobs:
           echo "diff_count=$diff_count" >> $GITHUB_ENV
           echo "diff_count=$diff_count" >> $GITHUB_OUTPUT
 
+          # 保存本次规则为 old_rules.txt
           cp dist/AdGuardHome.txt old_rules.txt
 
+      # Step 4: 提交更新到 GitHub 仓库
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
@@ -93,6 +124,7 @@ jobs:
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
 
+      # Step 5: 创建 GitHub Release
       - name: Create Release
         if: ${{ env.diff_count != '0' }}
         uses: softprops/action-gh-release@v2
@@ -100,19 +132,15 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "规则更新 - ${{ env.new_count }} 条"
           body: |
-            🧩 本次规则更新
+            本次规则更新：
             - 新增：**${{ env.diff_count }}** 条  
             - 总数：${{ env.new_count }}  
             - 阻止规则：${{ env.BLOCK_COUNT }}  
-            - 放行规则：${{ env.ALLOW_COUNT }}  
-
-            本规则专为 **AdGuard Home (软路由)** 优化：
-            - 🚫 移除元素屏蔽、JS 注入、$app、$csp、空规则、泛匹配
-            - 🛡️ 保留现有 $cookie 规则
-            - ✅ 保留纯 DNS 拦截规则，运行更快更稳定
+            - 放行规则：${{ env.ALLOW_COUNT }}
           files: |
             dist/AdGuardHome.txt
 
+      # Step 6: 输出规则统计信息
       - name: Show Rules Stats
         run: |
           echo "================= ✅ AdGuardHome Rules Build ================="
@@ -121,4 +149,5 @@ jobs:
           echo "阻止规则数: ${{ env.BLOCK_COUNT }}"
           echo "放行规则数: ${{ env.ALLOW_COUNT }}"
           echo "============================================================"
+          # 输出文件前 50 行预览
           head -n 50 dist/AdGuardHome.txt
