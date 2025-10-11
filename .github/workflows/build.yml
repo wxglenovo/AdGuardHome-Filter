@@ -59,17 +59,36 @@ jobs:
           # 删除网页 CSS、复杂正则和客户端专用规则
           grep -vE '##|\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/other_rules.txt > tmp/router_other.txt
 
+          # 删除 @@ 和 || 互相抵消的规则
+          awk '
+            /^@@\|\|/ { allow[$0]=1; next }
+            /^\|\|/ { block[$0]=1; next }
+            END {
+              for (b in block) {
+                key = b
+                gsub(/^\|\|/, "", key)
+                gsub(/\^$/, "", key)
+                cancel = "@@||" key "^"
+                if (!(cancel in allow)) print b
+              }
+              for (a in allow) {
+                key = a
+                gsub(/^@@\|\|/, "", key)
+                gsub(/\^$/, "", key)
+                cancel = "||" key "^"
+                if (!(cancel in block)) print a
+              }
+            }
+          ' tmp/router_other.txt > tmp/final_router.txt
+
           # 去掉 $all 标记和重复 IP
           awk '
             /^\|\|/ {
               rule = $0
               gsub(/\$all/, "", rule)
-              # 如果是 IP 地址规则，去掉重复
               if (rule ~ /^\|\|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\^/) {
                 if (!ip_seen[rule]++) print rule
-              } else {
-                rules[rule]=1
-              }
+              } else { rules[rule]=1 }
               next
             }
             /^@@\|\|/ { allow[$0]=1; next }
@@ -77,9 +96,9 @@ jobs:
               for (r in rules) print r
               for (a in allow) print a
             }
-          ' tmp/router_other.txt | sort > tmp/final_router.txt
+          ' tmp/final_router.txt | sort > tmp/final_sorted.txt
 
-          cat tmp/cookie_rules.txt tmp/final_router.txt > dist/AdGuardHome.txt
+          cat tmp/cookie_rules.txt tmp/final_sorted.txt > dist/AdGuardHome.txt
 
           echo "📊 统计规则数量..."
           rule_count=$(wc -l < dist/AdGuardHome.txt)
@@ -132,8 +151,8 @@ jobs:
           name: "路由器专用规则更新 - ${{ env.new_count }} 条"
           body: |
             本次规则更新：
-            - 总数：${{ env.new_count }}  
-            - 阻止规则：${{ env.BLOCK_COUNT }}  
+            - 总数：${{ env.new_count }}
+            - 阻止规则：${{ env.BLOCK_COUNT }}
             - 放行规则：${{ env.ALLOW_COUNT }}
           files: |
             dist/AdGuardHome.txt
