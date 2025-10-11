@@ -48,34 +48,35 @@ jobs:
           echo "🛠 修复 @@||@@|| → @@||"
           sed -i 's/@@||@@||/@@||/g' tmp/merged_clean.txt
 
-          echo "⚡ 删除无效 IP 规则..."
-          grep -vE '^\|\|\|\|[0-9]+\.' tmp/merged_clean.txt > tmp/merged_no_ip.txt
-
           echo "📌 分离 \$cookie 规则..."
-          grep '^\$cookie' tmp/merged_no_ip.txt > tmp/cookie_rules.txt
-          grep -v '^\$cookie' tmp/merged_no_ip.txt > tmp/other_rules.txt
+          grep '^\$cookie' tmp/merged_clean.txt > tmp/cookie_rules.txt
+          grep -v '^\$cookie' tmp/merged_clean.txt > tmp/other_rules.txt
 
           echo "📝 创建软路由专用版本..."
-          # 删除网页 CSS、复杂正则和客户端专用规则
-          grep -vE '##|\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/other_rules.txt > tmp/router_other.txt
+          grep -vE '\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/other_rules.txt > tmp/router_other.txt
 
-          # 去掉 $all 标记和重复 IP
+          echo "⚡ 转换 IP 规则为 0.0.0.0 格式并排除私有 IP..."
           awk '
-            /^\|\|/ {
-              rule = $0
-              gsub(/\$all/, "", rule)
-              # 如果是 IP 地址规则，去掉重复
-              if (rule ~ /^\|\|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\^/) {
-                if (!ip_seen[rule]++) print rule
-              } else {
-                rules[rule]=1
-              }
-              next
+            function is_ip(s) {
+              return s ~ /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/ || s ~ /^\|\|[0-9]{1,3}(\.[0-9]{1,3}){3}\^?$/
             }
-            /^@@\|\|/ { allow[$0]=1; next }
-            END {
-              for (r in rules) print r
-              for (a in allow) print a
+            function is_private_ip(ip) {
+              split(ip, a, ".")
+              return (a[1]==10) || (a[1]==127) || (a[1]==192 && a[2]==168) || (a[1]==172 && a[2]>=16 && a[2]<=31)
+            }
+            {
+              line=$0
+              gsub(/\^$/,"",line)
+              gsub(/^\|\|/,"",line)
+              if (is_ip(line)) {
+                if (!is_private_ip(line)) print "0.0.0.0 " line
+              } else if ($0 ~ /^@@\|\|/) {
+                gsub(/^\@\@\|\|/,"",$0)
+                gsub(/\^$/,"",$0)
+                print "@@||"$0"^"
+              } else {
+                print "||" line "^"
+              }
             }
           ' tmp/router_other.txt | sort > tmp/final_router.txt
 
@@ -85,10 +86,12 @@ jobs:
           rule_count=$(wc -l < dist/AdGuardHome.txt)
           allow_count=$(grep -c '^@@||' dist/AdGuardHome.txt || true)
           block_count=$(grep -c '^\|\|' dist/AdGuardHome.txt || true)
+          ip_count=$(grep -c '^0\.0\.0\.0' dist/AdGuardHome.txt || true)
 
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
+          echo "IP_COUNT=$ip_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
 
       - name: Compare Rules
@@ -135,12 +138,13 @@ jobs:
             - 总数：${{ env.new_count }}  
             - 阻止规则：${{ env.BLOCK_COUNT }}  
             - 放行规则：${{ env.ALLOW_COUNT }}
+            - IP 阻止：${{ env.IP_COUNT }}
           files: |
             dist/AdGuardHome.txt
 
       - name: Show Rules Stats
         run: |
           echo "================= ✅ 路由器专用 AdGuardHome Rules Build ================="
-          echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }})"
+          echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }}, 公网 IP ${{ env.IP_COUNT }})"
           echo "============================================================"
           head -n 50 dist/AdGuardHome.txt
