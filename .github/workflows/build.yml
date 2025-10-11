@@ -78,6 +78,7 @@ jobs:
           ' tmp/merged_no_ip.txt > tmp/final_router.txt
 
           echo "🧾 去掉 \$all 标记与重复规则..."
+          before_count=$(wc -l < tmp/final_router.txt)
           awk '
             /^\|\|/ {
               rule = $0
@@ -90,6 +91,11 @@ jobs:
               if (!seen[rule]++) print rule
             }
           ' tmp/final_router.txt | sort > tmp/final_sorted.txt
+          after_count=$(wc -l < tmp/final_sorted.txt)
+          removed_duplicates=$((before_count - after_count))
+
+          echo "去掉重复项数量：$removed_duplicates"
+          echo "REMOVED_DUPLICATES=$removed_duplicates" >> $GITHUB_ENV
 
           echo "📦 生成最终规则文件..."
           cp tmp/final_sorted.txt dist/AdGuardHome.txt
@@ -104,7 +110,7 @@ jobs:
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
 
-          echo "✅ 规则统计完成：总 $rule_count 行（阻止 $block_count，放行 $allow_count）"
+          echo "✅ 规则统计完成：总 $rule_count 行（阻止 $block_count，放行 $allow_count，去重 $removed_duplicates）"
           echo "----------------------------------------------------------"
           ls -lh tmp/ | sed 's/^/TMP 文件: /'
 
@@ -137,7 +143,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update rules: 新增 ${{ env.diff_count }} 条规则 (总数 ${{ env.new_count }})"
+            git commit -m "Update rules: 新增 ${{ env.diff_count }} 条 (去重 ${{ env.REMOVED_DUPLICATES }} 条, 总数 ${{ env.new_count }})"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
@@ -147,12 +153,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: "路由器专用规则更新 - ${{ env.new_count }} 条"
+          name: "路由器规则更新 - ${{ env.new_count }} 条"
           body: |
             📦 本次规则更新：
             - 总规则：${{ env.new_count }}
             - 阻止规则：${{ env.BLOCK_COUNT }}
             - 放行规则：${{ env.ALLOW_COUNT }}
+            - 去重条数：${{ env.REMOVED_DUPLICATES }}
           files: |
             dist/AdGuardHome.txt
 
@@ -160,6 +167,7 @@ jobs:
         run: |
           echo "================= ✅ 路由器专用 AdGuardHome Rules Build ================="
           echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }})"
+          echo "去重条数: ${{ env.REMOVED_DUPLICATES }}"
           echo "差异数量: ${{ env.diff_count }}"
           echo "============================================================"
           head -n 50 dist/AdGuardHome.txt
