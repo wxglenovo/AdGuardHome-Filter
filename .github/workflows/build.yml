@@ -1,4 +1,4 @@
-name: Build AdGuardHome Router Rules
+name: Build AdGuardHome rules
 
 on:
   schedule:
@@ -53,37 +53,45 @@ jobs:
           grep -v '^\$cookie' tmp/merged_clean.txt > tmp/other_rules.txt
 
           echo "📝 创建软路由专用版本..."
-          # 保留域名规则，转换 IP 规则为 0.0.0.0 IP
+          grep -vE '\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/other_rules.txt > tmp/router_other.txt
+
+          echo "⚡ 转换 IP 规则为 0.0.0.0 格式并排除私有 IP..."
           awk '
-            /^\|\|/ {
-              gsub(/\^.*$/, "", $0)
-              ip=$0
-              if ($0 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) {
-                print "0.0.0.0 " $0
-              } else if ($0 ~ /^\|\|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/) {
-                sub(/^\|\|/, "", $0)
-                print "0.0.0.0 " $0
+            function is_ip(s) {
+              return s ~ /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/ || s ~ /^\|\|[0-9]{1,3}(\.[0-9]{1,3}){3}\^?$/
+            }
+            function is_private_ip(ip) {
+              split(ip, a, ".")
+              return (a[1]==10) || (a[1]==127) || (a[1]==192 && a[2]==168) || (a[1]==172 && a[2]>=16 && a[2]<=31)
+            }
+            {
+              line=$0
+              gsub(/\^$/,"",line)
+              gsub(/^\|\|/,"",line)
+              if (is_ip(line)) {
+                if (!is_private_ip(line)) print "0.0.0.0 " line
+              } else if ($0 ~ /^@@\|\|/) {
+                gsub(/^\@\@\|\|/,"",$0)
+                gsub(/\^$/,"",$0)
+                print "@@||"$0"^"
               } else {
-                print "||" $0 "^"
+                print "||" line "^"
               }
             }
-            /^@@\|\|/ {
-              gsub(/\^.*$/, "", $0)
-              sub(/^@@\|\|/, "", $0)
-              print "@@||" $0 "^"
-            }
-          ' tmp/other_rules.txt | sort -u > tmp/final_router.txt
+          ' tmp/router_other.txt | sort > tmp/final_router.txt
 
           cat tmp/cookie_rules.txt tmp/final_router.txt > dist/AdGuardHome.txt
 
           echo "📊 统计规则数量..."
           rule_count=$(wc -l < dist/AdGuardHome.txt)
           allow_count=$(grep -c '^@@||' dist/AdGuardHome.txt || true)
-          block_count=$(grep -c '^\|\|0\.0\.0\.0' dist/AdGuardHome.txt || true)
+          block_count=$(grep -c '^\|\|' dist/AdGuardHome.txt || true)
+          ip_count=$(grep -c '^0\.0\.0\.0' dist/AdGuardHome.txt || true)
 
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
+          echo "IP_COUNT=$ip_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
 
       - name: Compare Rules
@@ -114,7 +122,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "Update router rules: 新增 ${{ env.diff_count }} 条规则 (总数 ${{ env.new_count }})"
+            git commit -m "Update rules: 新增 ${{ env.diff_count }} 条规则 (总数 ${{ env.new_count }})"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
@@ -127,15 +135,16 @@ jobs:
           name: "路由器专用规则更新 - ${{ env.new_count }} 条"
           body: |
             本次规则更新：
-            - 总数：${{ env.new_count }}
-            - 阻止规则：${{ env.BLOCK_COUNT }}
+            - 总数：${{ env.new_count }}  
+            - 阻止规则：${{ env.BLOCK_COUNT }}  
             - 放行规则：${{ env.ALLOW_COUNT }}
+            - IP 阻止：${{ env.IP_COUNT }}
           files: |
             dist/AdGuardHome.txt
 
       - name: Show Rules Stats
         run: |
           echo "================= ✅ 路由器专用 AdGuardHome Rules Build ================="
-          echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }})"
+          echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }}, 公网 IP ${{ env.IP_COUNT }})"
           echo "============================================================"
           head -n 50 dist/AdGuardHome.txt
