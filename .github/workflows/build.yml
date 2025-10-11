@@ -43,13 +43,16 @@ jobs:
           done
 
           echo "🧹 清理注释和空行..."
-          # 删除以 ! 或 ### 开头的注释行，以及空行
-          grep -vE '(^!|^###|^$)' tmp/all.txt > tmp/merged_clean.txt
+          grep -vE '(^!|^$)' tmp/all.txt > tmp/merged_clean.txt
 
-          echo "🔧 自动修复 @@||@@|| → @@||"
+          echo "🛠 修复 @@||@@|| → @@||"
           sed -i 's/@@||@@||/@@||/g' tmp/merged_clean.txt
 
-          echo "📊 按域名排序..."
+          echo "📌 分离 $cookie 规则..."
+          grep '^\$cookie' tmp/merged_clean.txt > tmp/cookie_rules.txt
+          grep -v '^\$cookie' tmp/merged_clean.txt > tmp/other_rules.txt
+
+          echo "📊 对非 $cookie 规则去重排序..."
           awk '
             /^\|\|/ { gsub(/\^.*/, "", $0); rules[$0]=1; next }
             /^@@\|\|/ { gsub(/\^.*/, "", $0); allow[$0]=1; next }
@@ -58,19 +61,20 @@ jobs:
               for (r in rules) print "||" r "^"
               for (a in allow) print "@@||" a "^"
             }
-          ' tmp/merged_clean.txt | sort > tmp/final_rules.txt
+          ' tmp/other_rules.txt | sort > tmp/final_other_rules.txt
+
+          echo "📝 合并 $cookie 规则和其他规则..."
+          cat tmp/cookie_rules.txt tmp/final_other_rules.txt > dist/AdGuardHome.txt
 
           echo "📊 统计规则数量..."
-          rule_count=$(wc -l < tmp/final_rules.txt)
-          allow_count=$(grep -c '^@@||' tmp/final_rules.txt || true)
-          block_count=$(grep -c '^\|\|' tmp/final_rules.txt || true)
+          rule_count=$(wc -l < dist/AdGuardHome.txt)
+          allow_count=$(grep -c '^@@||' dist/AdGuardHome.txt || true)
+          block_count=$(grep -c '^\|\|' dist/AdGuardHome.txt || true)
 
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
-
-          mv tmp/final_rules.txt dist/AdGuardHome.txt
 
       - name: Compare Rules
         id: diff
