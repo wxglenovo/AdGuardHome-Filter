@@ -38,35 +38,23 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          echo "合并并清理基础规则..."
-          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
-
-          echo "提取放行规则域名..."
-          grep '^@@||' tmp/merged_raw.txt | sed -E 's/^@@\|\|([^\/\^]+).*/\1/' > tmp/whitelist_domains.txt || true
-
-          cp tmp/merged_raw.txt tmp/merged.txt
-
-          echo "执行放行与阻止规则抵消..."
-          while read -r domain; do
-            if [ -n "$domain" ]; then
-              sed -i "/^\@\@||${domain}\^/d" tmp/merged.txt
-              sed -i "/^\|\|${domain}\^/d" tmp/merged.txt
-              echo "抵消规则：$domain"
-            fi
-          done < tmp/whitelist_domains.txt
-
-          echo "最终清理与去重..."
-          grep -v '^$' tmp/merged.txt | sort -u > tmp/merged_clean.txt
-          mv tmp/merged_clean.txt tmp/merged.txt
+          echo "合并并清理规则..."
+          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
 
           rule_count=$(wc -l < tmp/merged.txt)
+          allow_count=$(grep -c '^@@||' tmp/merged.txt || true)
+          block_count=$(grep -E -c '^\|\|' tmp/merged.txt || true)
           echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
+          echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
+          echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
 
           {
             echo "! ======================================="
             echo "! AdGuardHome Rules"
             echo "! Generated: $(date -u '+%Y-%m-%d %H:%M UTC')"
             echo "! Total rules: $rule_count"
+            echo "! Block rules: $block_count"
+            echo "! Allow rules: $allow_count"
             echo "! ======================================="
             echo ""
             cat tmp/merged.txt
@@ -113,7 +101,9 @@ jobs:
           name: "规则更新 - ${{ env.new_count }} 条"
           body: |
             本次更新共新增 **${{ env.diff_count }}** 条规则  
-            总规则数：${{ env.new_count }}
+            总规则数：${{ env.new_count }}  
+            阻止规则：${{ env.BLOCK_COUNT }}  
+            放行规则：${{ env.ALLOW_COUNT }}
           files: |
             dist/AdGuardHome.txt
 
@@ -122,5 +112,7 @@ jobs:
           echo "================= AdGuardHome Rules Update ================="
           echo "总规则数: ${{ env.new_count }}"
           echo "新增规则数: ${{ env.diff_count }}"
-          head -n 50 dist/AdGuardHome.txt
+          echo "阻止规则数: ${{ env.BLOCK_COUNT }}"
+          echo "放行规则数: ${{ env.ALLOW_COUNT }}"
           echo "============================================================"
+          head -n 50 dist/AdGuardHome.txt
