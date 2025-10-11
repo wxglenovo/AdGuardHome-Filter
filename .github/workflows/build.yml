@@ -1,13 +1,11 @@
 name: Build AdGuardHome rules
 
 on:
-  # 定时触发 workflow，分别每天的 0、6、12、18 点
   schedule:
     - cron: "0 0 * * *"
     - cron: "0 6 * * *"
     - cron: "0 12 * * *"
     - cron: "0 18 * * *"
-  # 支持手动触发
   workflow_dispatch:
 
 permissions:
@@ -18,11 +16,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: 拉取仓库代码
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Step 2: 下载规则并合并
       - name: Download & Merge Rules
         run: |
           mkdir -p dist tmp
@@ -46,14 +42,19 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          echo "🧹 清理注释和空行..."
-          grep -vE '(^!|^$)' tmp/all.txt | sort -u > tmp/merged_clean.txt
+          echo "🧹 清理空行和注释..."
+          # 删除以 ! 开头、以 ### 开头的注释行，以及空行
+          grep -vE '(^!|^###|^$)' tmp/all.txt | sort -u > tmp/merged_clean.txt
 
-          echo "🔧 修正 @@||@@|| → @@|| 并按域名排序..."
+          echo "📊 按域名排序..."
           awk '
-            # 修正放行规则 @@||@@|| → @@||
-            /^@@\|\|@@\|\|/ { sub(/^@@\|\|@@\|\|/, "@@||"); print; next }
-            { print }
+            /^\|\|/ { gsub(/\^.*/, "", $0); rules[$0]=1; next }
+            /^@@\|\|/ { gsub(/\^.*/, "", $0); allow[$0]=1; next }
+            { rules[$0]=1 }
+            END {
+              for (r in rules) print "||" r "^"
+              for (a in allow) print "@@||" a "^"
+            }
           ' tmp/merged_clean.txt | sort > tmp/final_rules.txt
 
           echo "📊 统计规则数量..."
@@ -68,7 +69,6 @@ jobs:
 
           mv tmp/final_rules.txt dist/AdGuardHome.txt
 
-      # Step 3: 对比历史规则
       - name: Compare Rules
         id: diff
         run: |
@@ -88,7 +88,6 @@ jobs:
 
           cp dist/AdGuardHome.txt old_rules.txt
 
-      # Step 4: 提交更新
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
@@ -103,7 +102,6 @@ jobs:
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
 
-      # Step 5: 创建 Release
       - name: Create Release
         if: ${{ env.diff_count != '0' }}
         uses: softprops/action-gh-release@v2
@@ -119,7 +117,6 @@ jobs:
           files: |
             dist/AdGuardHome.txt
 
-      # Step 6: 输出规则统计
       - name: Show Rules Stats
         run: |
           echo "================= ✅ AdGuardHome Rules Build ================="
