@@ -3,7 +3,9 @@ name: Build AdGuardHome rules
 on:
   schedule:
     - cron: "0 0 * * *"
+    - cron: "0 6 * * *"
     - cron: "0 12 * * *"
+    - cron: "0 18 * * *"
   workflow_dispatch:
 
 permissions:
@@ -42,8 +44,8 @@ jobs:
           echo "🧹 清理与合并..."
           grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
 
-          echo "🚫 删除无效规则（元素屏蔽、Cookie、JS 注入等）..."
-          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$cookie=)' tmp/merged_raw.txt > tmp/merged_clean.txt
+          echo "🚫 删除无效规则（元素屏蔽、Cookie、空规则、||^ 等）..."
+          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#|\$cookie=|^\|\|\^)' tmp/merged_raw.txt > tmp/merged_clean.txt
 
           echo "⚖️ 检查并移除相互抵消规则..."
           awk '
@@ -142,7 +144,7 @@ jobs:
             - 放行规则：${{ env.ALLOW_COUNT }}  
 
             本规则专为 **AdGuard Home** 优化：
-            - 🚫 已移除页面元素屏蔽、Cookie 与 JS 注入规则  
+            - 🚫 已移除页面元素屏蔽、Cookie、JS 注入、空规则 (`||^`)  
             - ⚖️ 已自动清理互相抵消的域名规则  
             - ✅ 保留纯 DNS 拦截，运行更快更稳定
           files: |
