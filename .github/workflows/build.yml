@@ -48,21 +48,26 @@ jobs:
           echo "🛠 修复 @@||@@|| → @@||"
           sed -i 's/@@||@@||/@@||/g' tmp/merged_clean.txt
 
-          echo "⚡ 删除无效 IP 规则（||||IP）..."
-          grep -vE '^\|\|\|\|[0-9]+\.' tmp/merged_clean.txt > tmp/merged_no_ip.txt
-
           echo "📌 分离 $cookie 规则..."
-          grep '^\$cookie' tmp/merged_no_ip.txt > tmp/cookie_rules.txt
-          grep -v '^\$cookie' tmp/merged_no_ip.txt > tmp/other_rules.txt
+          grep '^\$cookie' tmp/merged_clean.txt > tmp/cookie_rules.txt
+          grep -v '^\$cookie' tmp/merged_clean.txt > tmp/other_rules.txt
 
-          echo "📊 对非 $cookie 规则去重排序..."
+          echo "🔹 过滤放行规则，只保留必要域名..."
           awk '
-            /^\|\|/ { gsub(/\^.*/, "", $0); rules[$0]=1; next }
-            /^@@\|\|/ { gsub(/\^.*/, "", $0); allow[$0]=1; next }
-            { rules[$0]=1 }
+            BEGIN {
+              keep["@@||api.mi-img.com^"]=1
+              keep["@@||api.micloud.xiaomi.net^"]=1
+              keep["@@||api.minecraftservices.com^"]=1
+              keep["@@||api.mojang.com^"]=1
+            }
+            /^@@\|\|/ {
+              if ($0 in keep) allowed[$0]=1
+              next
+            }
+            { others[$0]=1 }
             END {
-              for (r in rules) print "||" r "^"
-              for (a in allow) print "@@||" a "^"
+              for (r in others) print r
+              for (a in allowed) print a
             }
           ' tmp/other_rules.txt | sort > tmp/final_other_rules.txt
 
