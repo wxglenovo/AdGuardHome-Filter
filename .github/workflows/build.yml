@@ -57,15 +57,25 @@ jobs:
 
           echo "📝 创建软路由专用版本..."
           # 删除网页 CSS、复杂正则和客户端专用规则
-          grep -vE '##|\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/merged_no_ip.txt > tmp/router_other.txt
+          grep -vE '##|\$script|\$popup|\$subdocument|\$frame|/\^|/\$' tmp/other_rules.txt > tmp/router_other.txt
 
+          # 去掉 $all 标记和重复 IP
           awk '
-            /^\|\|/ { gsub(/\^.*/, "", $0); rules[$0]=1; next }
-            /^@@\|\|/ { gsub(/\^.*/, "", $0); allow[$0]=1; next }
-            { rules[$0]=1 }
+            /^\|\|/ {
+              rule = $0
+              gsub(/\$all/, "", rule)
+              # 如果是 IP 地址规则，去掉重复
+              if (rule ~ /^\|\|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\^/) {
+                if (!ip_seen[rule]++) print rule
+              } else {
+                rules[rule]=1
+              }
+              next
+            }
+            /^@@\|\|/ { allow[$0]=1; next }
             END {
-              for (r in rules) print "||" r "^"
-              for (a in allow) print "@@||" a "^"
+              for (r in rules) print r
+              for (a in allow) print a
             }
           ' tmp/router_other.txt | sort > tmp/final_router.txt
 
