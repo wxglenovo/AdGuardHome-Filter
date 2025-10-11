@@ -2,10 +2,10 @@ name: Build AdGuardHome rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 6 * * *"
-    - cron: "0 12 * * *"
-    - cron: "0 18 * * *"
+    - cron: "0 0 * * *"     # 每天 UTC 0 点
+    - cron: "0 6 * * *"     # 每天 UTC 6 点
+    - cron: "0 12 * * *"    # 每天 UTC 12 点
+    - cron: "0 18 * * *"    # 每天 UTC 18 点
   workflow_dispatch:
 
 permissions:
@@ -28,16 +28,13 @@ jobs:
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/all-lite.txt"
             "https://raw.githubusercontent.com/privacy-protection-tools/anti-AD/master/anti-ad-easylist.txt"
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/all-lite.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"          
             "https://easylist-downloads.adblockplus.org/easylist.txt"
             "https://easylist-downloads.adblockplus.org/easylistchina.txt"
             "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
             "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
             "https://raw.githubusercontent.com/banbendalao/ADgk/master/kill-baidu-ad.txt"
-            "https://www.i-dont-care-about-cookies.eu/abp/"    
+            "https://www.i-dont-care-about-cookies.eu/abp/"
           )
-
 
           echo "📥 下载规则..."
           for url in "${urls[@]}"; do
@@ -46,7 +43,7 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          echo "🧹 清理注释、空行..."
+          echo "🧹 清理注释与空行..."
           grep -vE '(^!|^$|##)' tmp/all.txt > tmp/merged_clean.txt
 
           echo "🛠 修复 @@||@@|| → @@||"
@@ -55,9 +52,7 @@ jobs:
           echo "⚡ 删除无效 IP 规则..."
           grep -vE '^\|\|\|\|[0-9]+\.' tmp/merged_clean.txt > tmp/merged_no_ip.txt
 
-
-
-          # 删除 @@ 和 || 互相抵消的规则
+          echo "🧩 删除相互抵消的规则..."
           awk '
             /^@@\|\|/ { allow[$0]=1; next }
             /^\|\|/ { block[$0]=1; next }
@@ -77,26 +72,24 @@ jobs:
                 if (!(cancel in block)) print a
               }
             }
-          ' tmp/router_other.txt > tmp/final_router.txt
+          ' tmp/merged_no_ip.txt > tmp/final_router.txt
 
-          # 去掉 $all 标记和重复 IP
+          echo "🧾 去掉 \$all 标记与重复规则..."
           awk '
             /^\|\|/ {
               rule = $0
               gsub(/\$all/, "", rule)
-              if (rule ~ /^\|\|[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\^/) {
-                if (!ip_seen[rule]++) print rule
-              } else { rules[rule]=1 }
+              if (!seen[rule]++) print rule
               next
             }
-            /^@@\|\|/ { allow[$0]=1; next }
-            END {
-              for (r in rules) print r
-              for (a in allow) print a
+            /^@@\|\|/ {
+              rule = $0
+              if (!seen[rule]++) print rule
             }
           ' tmp/final_router.txt | sort > tmp/final_sorted.txt
 
-          cat tmp/cookie_rules.txt tmp/final_sorted.txt > dist/AdGuardHome.txt
+          echo "📦 生成最终规则文件..."
+          cp tmp/final_sorted.txt dist/AdGuardHome.txt
 
           echo "📊 统计规则数量..."
           rule_count=$(wc -l < dist/AdGuardHome.txt)
@@ -107,6 +100,10 @@ jobs:
           echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
           echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
           echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
+
+          echo "✅ 规则统计完成：总 $rule_count 行（阻止 $block_count，放行 $allow_count）"
+          echo "----------------------------------------------------------"
+          ls -lh tmp/ | sed 's/^/TMP 文件: /'
 
       - name: Compare Rules
         id: diff
@@ -123,6 +120,7 @@ jobs:
           echo "old_count=$old_count" >> $GITHUB_ENV
           echo "new_count=$new_count" >> $GITHUB_ENV
           echo "diff_count=$diff_count" >> $GITHUB_ENV
+
           echo "diff_count=$diff_count" >> $GITHUB_OUTPUT
 
           cp dist/AdGuardHome.txt old_rules.txt
@@ -148,8 +146,8 @@ jobs:
           tag_name: ${{ env.RELEASE_TAG }}
           name: "路由器专用规则更新 - ${{ env.new_count }} 条"
           body: |
-            本次规则更新：
-            - 总数：${{ env.new_count }}
+            📦 本次规则更新：
+            - 总规则：${{ env.new_count }}
             - 阻止规则：${{ env.BLOCK_COUNT }}
             - 放行规则：${{ env.ALLOW_COUNT }}
           files: |
@@ -159,5 +157,6 @@ jobs:
         run: |
           echo "================= ✅ 路由器专用 AdGuardHome Rules Build ================="
           echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }})"
+          echo "差异数量: ${{ env.diff_count }}"
           echo "============================================================"
           head -n 50 dist/AdGuardHome.txt
