@@ -38,8 +38,12 @@ jobs:
             echo "" >> tmp/all.txt
           done
 
-          echo "合并并清理规则..."
-          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged.txt
+          echo "合并规则..."
+          grep -v '^$' tmp/all.txt | grep -v '^[!#]' | sort -u > tmp/merged_raw.txt
+
+          echo "清理无效规则（元素屏蔽 / 页面规则）..."
+          # 删除 AdGuard Home 不支持的页面元素屏蔽规则
+          grep -vE '(^\$\$|##|#@#|#\?#|#\$#|#%#)' tmp/merged_raw.txt > tmp/merged.txt
 
           rule_count=$(wc -l < tmp/merged.txt)
           allow_count=$(grep -c '^@@||' tmp/merged.txt || true)
