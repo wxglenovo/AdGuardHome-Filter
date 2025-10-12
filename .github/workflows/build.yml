@@ -1,4 +1,4 @@
-name: Build AdGuardHome rules
+name: Build AdGuardHome rules (Merge Only)
 
 on:
   schedule:
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules
+      - name: Download & Merge Rules (No Processing)
         run: |
           mkdir -p dist tmp
 
@@ -41,124 +41,35 @@ jobs:
             "https://www.i-dont-care-about-cookies.eu/abp/"
           )
 
-          echo "📥 下载规则..."
+          echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all.txt || echo "Failed $url"
             echo "" >> tmp/all.txt
           done
 
-          echo "🧹 清理注释与空行..."
-          grep -vE '(^!|^$|##)' tmp/all.txt > tmp/merged_clean.txt
-
-          echo "🛠 修复 @@||@@|| → @@||"
-          sed -i 's/@@||@@||/@@||/g' tmp/merged_clean.txt
-
-          echo "⚡ 删除无效 IP 规则..."
-          grep -vE '^\|\|\|\|[0-9]+\.' tmp/merged_clean.txt > tmp/merged_no_ip.txt
-
-          echo "🧩 删除相互抵消的规则..."
-          awk '
-            /^@@\|\|/ { allow[$0]=1; next }
-            /^\|\|/ { block[$0]=1; next }
-            END {
-              for (b in block) {
-                key = b
-                gsub(/^\|\|/, "", key)
-                gsub(/\^$/, "", key)
-                cancel = "@@||" key "^"
-                if (!(cancel in allow)) print b
-              }
-              for (a in allow) {
-                key = a
-                gsub(/^@@\|\|/, "", key)
-                gsub(/\^$/, "", key)
-                cancel = "||" key "^"
-                if (!(cancel in block)) print a
-              }
-            }
-          ' tmp/merged_no_ip.txt > tmp/final_router.txt
-
-          echo "🧾 去掉 \$all 标记与重复规则..."
-          before_count=$(wc -l < tmp/final_router.txt)
-          awk '
-            /^\|\|/ {
-              rule = $0
-              gsub(/\$all/, "", rule)
-              if (!seen[rule]++) print rule
-              next
-            }
-            /^@@\|\|/ {
-              rule = $0
-              if (!seen[rule]++) print rule
-            }
-          ' tmp/final_router.txt | sort > tmp/final_sorted.txt
-          after_count=$(wc -l < tmp/final_sorted.txt)
-          removed_duplicates=$((before_count - after_count))
-
-          echo "去掉重复项数量：$removed_duplicates"
-          echo "REMOVED_DUPLICATES=$removed_duplicates" >> $GITHUB_ENV
-
-          echo "📦 生成最终规则文件..."
-          cp tmp/final_sorted.txt dist/AdGuardHome.txt
-
-          echo "📑 拆分白名单和黑名单..."
-          grep '^@@\|\|' dist/AdGuardHome.txt > dist/AdGuardHome_Allow.txt
-          grep '^\|\|' dist/AdGuardHome.txt | grep -v '^@@' > dist/AdGuardHome_Block.txt
-
-          echo "📊 统计规则数量..."
-          rule_count=$(wc -l < dist/AdGuardHome.txt)
-          allow_count=$(wc -l < dist/AdGuardHome_Allow.txt)
-          block_count=$(wc -l < dist/AdGuardHome_Block.txt)
-
-          echo "RELEASE_TAG=rules-$(date -u +'%Y%m%d')" >> $GITHUB_ENV
-          echo "ALLOW_COUNT=$allow_count" >> $GITHUB_ENV
-          echo "BLOCK_COUNT=$block_count" >> $GITHUB_ENV
-          echo "RULE_COUNT=$rule_count" >> $GITHUB_ENV
-
-          echo "✅ 规则统计完成：总 $rule_count 行（阻止 $block_count，放行 $allow_count，去重 $removed_duplicates）"
+          echo "📦 生成最终合并文件..."
+          cp tmp/all.txt dist/AdGuardHome_Merged.txt
 
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/*.txt
+          git add dist/AdGuardHome_Merged.txt
 
           if git diff --cached --quiet; then
-            echo "No changes to commit"
+            echo "No new rules to commit"
           else
-            git commit -m "Update rules: 黑名单 ${{ env.BLOCK_COUNT }} 条, 白名单 ${{ env.ALLOW_COUNT }} 条 (去重 ${{ env.REMOVED_DUPLICATES }} 条)"
+            git commit -m "Update merged AdGuardHome rules (no processing)"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
 
-      - name: Create Release
-        if: ${{ env.RULE_COUNT != '0' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.RELEASE_TAG }}
-          name: "路由器规则更新 - 总 ${ { env.RULE_COUNT } } 条"
-          body: |
-            📦 本次规则更新：
-            - 总规则：${{ env.RULE_COUNT }}
-            - 阻止规则（黑名单）：${{ env.BLOCK_COUNT }}
-            - 放行规则（白名单）：${{ env.ALLOW_COUNT }}
-            - 去重条数：${{ env.REMOVED_DUPLICATES }}
-          files: |
-            dist/AdGuardHome.txt
-            dist/AdGuardHome_Block.txt
-            dist/AdGuardHome_Allow.txt
-
-      - name: Show Rules Stats
+      - name: Show Merged Result
         run: |
-          echo "================= ✅ 路由器专用 AdGuardHome Rules Build ================="
-          echo "总规则数: ${{ env.RULE_COUNT }} (阻止 ${{ env.BLOCK_COUNT }}, 放行 ${{ env.ALLOW_COUNT }})"
-          echo "去重条数: ${{ env.REMOVED_DUPLICATES }}"
-          echo "============================================================"
-          echo ""
-          echo "📋 前 20 条黑名单规则（BLOCK LIST）："
-          head -n 20 dist/AdGuardHome_Block.txt
-          echo ""
-          echo "📋 前 20 条白名单规则（ALLOW LIST）："
-          head -n 20 dist/AdGuardHome_Allow.txt
+          echo "================= ✅ 合并完成 ================="
+          echo "文件路径：dist/AdGuardHome_Merged.txt"
+          echo "总行数：$(wc -l < dist/AdGuardHome_Merged.txt)"
+          echo "前 20 行示例："
+          head -n 20 dist/AdGuardHome_Merged.txt
           echo "============================================================"
