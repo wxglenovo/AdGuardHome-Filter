@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (No Processing)
+      - name: Download & Merge Rules (Clean + Merge)
         run: |
           mkdir -p dist tmp
 
@@ -48,8 +48,9 @@ jobs:
             echo "" >> tmp/all_raw.txt
           done
 
-          echo "🧹 去掉注释与空行..."
-          grep -vE '^!|^$' tmp/all_raw.txt > tmp/all_cleaned.txt
+          echo "🧹 清理注释与空行..."
+          # 删除以 ! 开头（含空格前缀）的注释和空行
+          grep -vE '^[[:space:]]*!' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📦 生成最终合并文件..."
           cp tmp/all_cleaned.txt dist/AdGuardHome_Merged.txt
@@ -63,7 +64,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No new rules to commit"
           else
-            git commit -m "Update merged AdGuardHome rules (no comments)"
+            git commit -m "Update merged AdGuardHome rules (comments removed)"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
