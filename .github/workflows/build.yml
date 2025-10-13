@@ -44,12 +44,15 @@ jobs:
           echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL --retry 3 --fail "$url" >> tmp/all.txt || echo "Failed $url"
-            echo "" >> tmp/all.txt
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            echo "" >> tmp/all_raw.txt
           done
 
+          echo "🧹 去掉注释与空行..."
+          grep -vE '^!|^$' tmp/all_raw.txt > tmp/all_cleaned.txt
+
           echo "📦 生成最终合并文件..."
-          cp tmp/all.txt dist/AdGuardHome_Merged.txt
+          cp tmp/all_cleaned.txt dist/AdGuardHome_Merged.txt
 
       - name: Commit & Push
         run: |
@@ -60,7 +63,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No new rules to commit"
           else
-            git commit -m "Update merged AdGuardHome rules (no processing)"
+            git commit -m "Update merged AdGuardHome rules (no comments)"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
