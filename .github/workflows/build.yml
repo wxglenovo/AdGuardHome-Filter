@@ -1,4 +1,4 @@
-name: Build AdGuardHome rules (Merge Only)
+name: Build AdGuardHome rules (Merge + Release)
 
 on:
   schedule:
@@ -59,13 +59,11 @@ jobs:
           echo "去重后：$DEDUP_COUNT" | tee -a dist/stats.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/stats.txt
 
-          echo "📦 生成最终合并文件..."
           cp tmp/all_deduped.txt dist/AdGuardHome_Merged.txt
-
-          # 保存行数供后续比较
           echo "$DEDUP_COUNT" > dist/line_count.txt
 
-      - name: Commit & Push
+      - name: Commit Changes
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -74,23 +72,43 @@ jobs:
           NEW_COUNT=$(cat dist/line_count.txt)
           NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
-          RAW_COUNT=$(grep "原始总数" dist/stats.txt | awk '{print $2}')
           DUP_COUNT=$(grep "重复行数" dist/stats.txt | awk '{print $2}')
+
+          COMMIT_MSG="Update merged AdGuardHome rules 🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
           git add dist/AdGuardHome_Merged.txt dist/stats.txt dist/line_count.txt
 
           if git diff --cached --quiet; then
+            echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
           else
-            COMMIT_MSG="Update merged AdGuardHome rules 🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
+            echo "no_change=false" >> $GITHUB_OUTPUT
             echo "$COMMIT_MSG"
             git commit -m "$COMMIT_MSG"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
+            echo "new_added=$NEW_ADDED" >> $GITHUB_OUTPUT
           fi
 
-      - name: Show Merged Result
+      - name: Create or Update Release
+        if: steps.commit.outputs.no_change == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "🧩 AdGuardHome Rules - $(date +'%Y-%m-%d')"
+          body: |
+            ${{ steps.commit.outputs.commit_message }}
+            ---
+            📦 文件名：AdGuardHome_Merged.txt  
+            📊 总行数：${{ steps.commit.outputs.new_count }}  
+            ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
+          files: |
+            dist/AdGuardHome_Merged.txt
+            dist/stats.txt
+
+      - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/stats.txt
