@@ -1,4 +1,4 @@
-name: Build AdGuardHome rules (Merge + Release)
+name: Build AdGuardHome rules 
 
 on:
   schedule:
@@ -106,7 +106,7 @@ jobs:
             📊 总行数：${{ steps.commit.outputs.new_count }}  
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
-            dist/AdGuardHome_Merged.txt
+            dist/AdGuardHome.txt
             dist/stats.txt
 
       - name: Show Result
