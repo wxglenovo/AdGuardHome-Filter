@@ -105,7 +105,7 @@ jobs:
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
             dist/AdGuardHome.txt
-            dist/old_rules.txt
+            old_rules.txt
 
       - name: Show Result
         run: |
