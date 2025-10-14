@@ -47,7 +47,6 @@ jobs:
           done
 
           echo "🧹 清理注释、系统提示与空行..."
-          # 删除以 ! 或 # 开头（含空格前缀）的注释行和空行
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 统计去重前后行数..."
@@ -63,16 +62,30 @@ jobs:
           echo "📦 生成最终合并文件..."
           cp tmp/all_deduped.txt dist/AdGuardHome_Merged.txt
 
+          # 保存行数供后续比较
+          echo "$DEDUP_COUNT" > dist/line_count.txt
+
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dist/AdGuardHome_Merged.txt dist/stats.txt
+
+          PREV_COUNT=$(git show origin/main:dist/line_count.txt 2>/dev/null || echo 0)
+          NEW_COUNT=$(cat dist/line_count.txt)
+          NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
+          [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
+
+          RAW_COUNT=$(grep "原始总数" dist/stats.txt | awk '{print $2}')
+          DUP_COUNT=$(grep "重复行数" dist/stats.txt | awk '{print $2}')
+
+          git add dist/AdGuardHome_Merged.txt dist/stats.txt dist/line_count.txt
 
           if git diff --cached --quiet; then
             echo "No new rules to commit"
           else
-            git commit -m "Update merged AdGuardHome rules (comments & system headers removed)"
+            COMMIT_MSG="Update merged AdGuardHome rules 🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
+            echo "$COMMIT_MSG"
+            git commit -m "$COMMIT_MSG"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
