@@ -47,9 +47,9 @@ jobs:
             echo "" >> tmp/all_raw.txt
           done
 
-          echo "🧹 清理注释与空行..."
-          # 删除以 ! 开头（含空格前缀）的注释和空行
-          grep -vE '^[[:space:]]*!' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
+          echo "🧹 清理注释、系统提示与空行..."
+          # 删除以 ! 或 # 开头（含空格前缀）的注释行和空行
+          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 统计去重前后行数..."
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
@@ -73,7 +73,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No new rules to commit"
           else
-            git commit -m "Update merged AdGuardHome rules (cleaned & deduplicated)"
+            git commit -m "Update merged AdGuardHome rules (comments & system headers removed)"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           fi
