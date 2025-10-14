@@ -98,7 +98,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ github.run_number }}"
-          name: "🧩 AdGuardHome Rules - $(date +'%Y-%m-%d')"
+          name: "🧩 AdGuardHome Rules"
           body: |
             ${{ steps.commit.outputs.commit_message }}
             ---
@@ -107,15 +107,15 @@ jobs:
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
             dist/AdGuardHome.txt
-            dist/stats.txt
+          
 
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/stats.txt
           echo "------------------------------------------------------------"
-          echo "文件路径：dist/AdGuardHome_Merged.txt"
-          echo "总行数：$(wc -l < dist/AdGuardHome_Merged.txt)"
+          echo "文件路径：dist/AdGuardHome.txt"
+          echo "总行数：$(wc -l < dist/AdGuardHome.txt)"
           echo "前 20 行示例："
-          head -n 20 dist/AdGuardHome_Merged.txt
+          head -n 20 dist/AdGuardHome.txt
           echo "============================================================"
