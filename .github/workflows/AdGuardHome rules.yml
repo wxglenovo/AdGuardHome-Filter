@@ -23,10 +23,8 @@ jobs:
         run: |
           mkdir -p dist tmp
 
-          # ✅ 第一个为优先放行规则
-          PRIORITY_URL="https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
-
           urls=(
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
             "https://easylist-downloads.adblockplus.org/easylist.txt"
             "https://easylist-downloads.adblockplus.org/easylistchina.txt"
@@ -40,56 +38,51 @@ jobs:
             "https://www.i-dont-care-about-cookies.eu/abp/"
           )
 
-          echo "📥 下载优先放行规则..."
-          curl -sSL --retry 3 --fail "$PRIORITY_URL" > tmp/priority.txt || echo "Failed $PRIORITY_URL"
-          echo "" >> tmp/priority.txt
-
-          echo "📥 下载其他规则..."
+          echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
 
-          echo "🧹 清理注释、空行..."
+          echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序..."
+          echo "📊 去重并排序白名单..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
-          # ✅ 将 @@|| 开头的白名单规则排前面（放行优先）
+          # ✅ 将 wxglenovo 的白名单放最前
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ 合并：优先白名单（自定义） + 普通白名单 + 阻止规则
-          cat tmp/priority.txt tmp/whitelist.txt tmp/blocklist.txt > tmp/all_deduped.txt
+          # ✅ wxglenovo 源内白名单优先置顶
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+            | grep '^@@||' > tmp/source_whitelist.txt
 
-          # ✅ 统计信息
+          cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
+
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
-          PRIORITY_COUNT=$(wc -l < tmp/priority.txt)
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
 
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
-          echo "自定义白名单条数：$PRIORITY_COUNT" | tee -a dist/old_rules.txt
-          echo "其他白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
+          echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          # ✅ 生成最终 AdGuardHome.txt 文件
+          # ✅ 生成 AdGuardHome.txt 文件并在顶部添加统计信息
           {
             echo "! ================================================================"
-            echo "! 🧩 AdGuardHome 合并规则"
+            echo "! 🧩 AdGuardHome 规则合并结果"
             echo "! 更新时间：$TIMESTAMP"
-            echo "! 原始总数：$RAW_COUNT"
-            echo "! 去重后：$DEDUP_COUNT"
-            echo "! 重复行数：$DUP_COUNT"
-            echo "! 自定义白名单：$PRIORITY_COUNT"
-            echo "! 其他白名单：$WHITELIST_COUNT"
-            echo "! 来源总数：$(( ${#urls[@]} + 1 ))"
+            echo "! 原始规则数：$RAW_COUNT"
+            echo "! 去重后规则数：$DEDUP_COUNT"
+            echo "! 去重条数：$DUP_COUNT"
+            echo "! 白名单条数：$WHITELIST_COUNT"
+            echo "! 来源列表：${#urls[@]} 个"
             echo "! ================================================================"
             echo ""
             cat tmp/all_deduped.txt
@@ -107,7 +100,9 @@ jobs:
           NEW_COUNT=$(cat dist/line_count.txt)
           NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-          DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | awk '{print $2}')
+
+          # ✅ 修复去重条数取值失败问题（兼容中文冒号）
+          DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
 
           COMMIT_MSG="Update merged AdGuardHome rules 🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
@@ -141,7 +136,7 @@ jobs:
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
             dist/AdGuardHome.txt
-            dist/old_rules.txt
+            old_rules.txt
 
       - name: Show Result
         run: |
