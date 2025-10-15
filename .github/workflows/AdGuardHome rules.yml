@@ -55,11 +55,11 @@ jobs:
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ wxglenovo 源内白名单优先置顶
+          # ✅ wxglenovo 源内白名单优先置顶，避免重复
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
-            | grep '^@@||' > tmp/source_whitelist.txt
+            | grep '^@@||' | sort | uniq > tmp/source_whitelist.txt
 
-          cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
+          cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | sort | uniq > tmp/all_deduped.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
@@ -68,15 +68,18 @@ jobs:
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
           WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
-          # 统计信息保存到 dist/old_rules.txt
-          echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
-          echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
-          echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
-          echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
-          echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
-          echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
+          # 保存统计信息
+          {
+            echo "原始总数：$RAW_COUNT"
+            echo "去重后：$DEDUP_COUNT"
+            echo "重复行数：$DUP_COUNT"
+            echo "白名单条数：$WHITELIST_COUNT"
+            echo "白名单比例：${WHITE_RATIO}%"
+            echo "更新时间：$TIMESTAMP"
+            echo "来源列表：${#urls[@]} 个"
+          } | tee dist/old_rules.txt
 
-          # ✅ 生成 AdGuardHome.txt 文件，只保留统计信息和规则
+          # 生成 AdGuardHome.txt（无 ! 注释）
           {
             echo "更新时间：$TIMESTAMP"
             echo "原始规则数：$RAW_COUNT"
