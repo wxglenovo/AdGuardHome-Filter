@@ -1,4 +1,5 @@
-name: Build AdGuardHome rules 
+name: Build AdGuardHome rules
+
 on:
   schedule:
     - cron: "0 0 * * *"
@@ -29,7 +30,7 @@ jobs:
             "https://easylist-downloads.adblockplus.org/easylistchina.txt"
             "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
             "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/kill-baidu-ad.txt"          
+            "https://raw.githubusercontent.com/banbendalao/ADgk/master/kill-baidu-ad.txt"
             "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
             "https://anti-ad.net/easylist.txt"
@@ -47,17 +48,40 @@ jobs:
           echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 统计去重前后行数..."
+          echo "📊 去重并排序白名单..."
+          sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
+
+          # ✅ 将 @@|| 开头的白名单规则排前面
+          grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
+          grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
+          cat tmp/whitelist.txt tmp/blocklist.txt > tmp/all_deduped.txt
+
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          sort tmp/all_cleaned.txt | uniq > tmp/all_deduped.txt
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
+          WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
+          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
 
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
+          echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
+          echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          cp tmp/all_deduped.txt dist/AdGuardHome.txt
+          # ✅ 生成 AdGuardHome.txt 文件并在顶部添加统计信息
+          {
+            echo "! ================================================================"
+            echo "! 🧩 AdGuardHome 规则合并结果"
+            echo "! 更新时间：$TIMESTAMP"
+            echo "! 总规则数：$DEDUP_COUNT"
+            echo "! 白名单条数：$WHITELIST_COUNT"
+            echo "! 去重行数：$DUP_COUNT"
+            echo "! 来源列表数：${#urls[@]}"
+            echo "! ================================================================"
+            echo ""
+            cat tmp/all_deduped.txt
+          } > dist/AdGuardHome.txt
+
           echo "$DEDUP_COUNT" > dist/line_count.txt
 
       - name: Commit Changes
