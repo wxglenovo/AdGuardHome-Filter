@@ -38,7 +38,7 @@ jobs:
             "https://www.i-dont-care-about-cookies.eu/abp/"
           )
 
-          echo "📥 开始下载并合并所有规则..."
+          echo "📥 开始下载所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
@@ -48,17 +48,18 @@ jobs:
           echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序白名单..."
+          echo "📊 去重规则..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
-          # ✅ 将 wxglenovo 的白名单放最前
+          # ✅ 分离白名单和阻止规则
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ wxglenovo 源内白名单优先置顶，避免重复
+          # ✅ wxglenovo 白名单置顶
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' | sort | uniq > tmp/source_whitelist.txt
 
+          # ✅ 最终合并顺序：wxglenovo 白名单 > 其他白名单 > 阻止规则
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | sort | uniq > tmp/all_deduped.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
@@ -79,76 +80,17 @@ jobs:
             echo "来源列表：${#urls[@]} 个"
           } | tee dist/old_rules.txt
 
-          # 生成 AdGuardHome.txt（无 ! 注释）
+          # ✅ 生成 AdGuardHome.txt（带 ! 注释统计信息）
           {
-            echo "更新时间：$TIMESTAMP"
-            echo "原始规则数：$RAW_COUNT"
-            echo "去重后规则数：$DEDUP_COUNT"
-            echo "去重条数：$DUP_COUNT"
-            echo "白名单条数：$WHITELIST_COUNT"
-            echo "白名单比例：${WHITE_RATIO}%"
-            echo "来源列表：${#urls[@]} 个"
+            echo "! 更新时间：$TIMESTAMP"
+            echo "! 原始规则数：$RAW_COUNT"
+            echo "! 去重后规则数：$DEDUP_COUNT"
+            echo "! 去重条数：$DUP_COUNT"
+            echo "! 白名单条数：$WHITELIST_COUNT"
+            echo "! 白名单比例：${WHITE_RATIO}%"
+            echo "! 来源列表：${#urls[@]} 个"
             echo ""
             cat tmp/all_deduped.txt
           } > dist/AdGuardHome.txt
 
           echo "$DEDUP_COUNT" > dist/line_count.txt
-
-      - name: Commit Changes
-        id: commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          PREV_COUNT=$(git show origin/main:dist/line_count.txt 2>/dev/null || echo 0)
-          NEW_COUNT=$(cat dist/line_count.txt)
-          NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
-          [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
-          DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
-
-          COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
-
-          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
-
-          if git diff --cached --quiet; then
-            echo "no_change=true" >> $GITHUB_OUTPUT
-            echo "No new rules to commit"
-          else
-            echo "no_change=false" >> $GITHUB_OUTPUT
-            echo "$COMMIT_MSG"
-            git commit -m "$COMMIT_MSG"
-            git pull --rebase origin main || true
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-            echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
-            echo "new_added=$NEW_ADDED" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create or Update Release
-        if: steps.commit.outputs.no_change == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ github.run_number }}"
-          name: "🧩 AdGuardHome Rules"
-          body: |
-            ${{ steps.commit.outputs.commit_message }}
-            ---
-            📦 文件名：AdGuardHome.txt  
-            📊 总行数：${{ steps.commit.outputs.new_count }}  
-            ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
-          files: |
-            dist/AdGuardHome.txt
-            dist/old_rules.txt
-
-      - name: Show Result
-        run: |
-          echo "================= ✅ 合并完成 ================="
-          cat dist/old_rules.txt
-          echo "------------------------------------------------------------"
-          echo "📁 文件路径：dist/AdGuardHome.txt"
-          echo "📊 总行数：$(wc -l < dist/AdGuardHome.txt)"
-          echo "------------------------------------------------------------"
-          echo "前 20 行示例："
-          head -n 20 dist/AdGuardHome.txt
-          echo "============================================================"
