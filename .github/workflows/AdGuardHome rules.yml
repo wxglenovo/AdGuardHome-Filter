@@ -64,16 +64,17 @@ jobs:
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-          WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
+          WHITELIST_COUNT=$(grep -c '^@@||' tmp/all_deduped.txt)
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
+          WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
           echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
+          echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          # ✅ 生成 AdGuardHome.txt 文件并在顶部添加统计信息
           {
             echo "! ================================================================"
             echo "! 🧩 AdGuardHome 规则合并结果"
@@ -82,6 +83,7 @@ jobs:
             echo "! 去重后规则数：$DEDUP_COUNT"
             echo "! 去重条数：$DUP_COUNT"
             echo "! 白名单条数：$WHITELIST_COUNT"
+            echo "! 白名单比例：${WHITE_RATIO}%"
             echo "! 来源列表：${#urls[@]} 个"
             echo "! ================================================================"
             echo ""
@@ -101,10 +103,9 @@ jobs:
           NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
 
-          # ✅ 修复去重条数取值失败问题（兼容中文冒号）
           DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
 
-          COMMIT_MSG="Update merged AdGuardHome rules 🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
+          COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
           git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
 
@@ -136,15 +137,16 @@ jobs:
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
             dist/AdGuardHome.txt
-            old_rules.txt
+            dist/old_rules.txt
 
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
           echo "------------------------------------------------------------"
-          echo "文件路径：dist/AdGuardHome.txt"
-          echo "总行数：$(wc -l < dist/AdGuardHome.txt)"
+          echo "📁 文件路径：dist/AdGuardHome.txt"
+          echo "📊 总行数：$(wc -l < dist/AdGuardHome.txt)"
+          echo "------------------------------------------------------------"
           echo "前 20 行示例："
           head -n 20 dist/AdGuardHome.txt
           echo "============================================================"
