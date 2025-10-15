@@ -38,14 +38,14 @@ jobs:
             "https://www.i-dont-care-about-cookies.eu/abp/"
           )
 
-          echo "📥 开始下载所有规则..."
+          echo "📥 下载所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
 
-          echo "🧹 清理注释、系统提示与空行..."
+          echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重规则..."
@@ -55,11 +55,11 @@ jobs:
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ wxglenovo 白名单置顶
+          # ✅ wxglenovo 白名单优先
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' | sort | uniq > tmp/source_whitelist.txt
 
-          # ✅ 最终合并顺序：wxglenovo 白名单 > 其他白名单 > 阻止规则
+          # ✅ 最终顺序：wxglenovo 白名单 > 其他白名单 > 阻止规则
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | sort | uniq > tmp/all_deduped.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
