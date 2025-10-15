@@ -68,6 +68,7 @@ jobs:
           TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
           WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
+          # 统计信息保存到 dist/old_rules.txt
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
@@ -75,17 +76,15 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
+          # ✅ 生成 AdGuardHome.txt 文件，只保留统计信息和规则
           {
-            echo "! ================================================================"
-            echo "! 🧩 AdGuardHome 规则合并结果"
-            echo "! 更新时间：$TIMESTAMP"
-            echo "! 原始规则数：$RAW_COUNT"
-            echo "! 去重后规则数：$DEDUP_COUNT"
-            echo "! 去重条数：$DUP_COUNT"
-            echo "! 白名单条数：$WHITELIST_COUNT"
-            echo "! 白名单比例：${WHITE_RATIO}%"
-            echo "! 来源列表：${#urls[@]} 个"
-            echo "! ================================================================"
+            echo "更新时间：$TIMESTAMP"
+            echo "原始规则数：$RAW_COUNT"
+            echo "去重后规则数：$DEDUP_COUNT"
+            echo "去重条数：$DUP_COUNT"
+            echo "白名单条数：$WHITELIST_COUNT"
+            echo "白名单比例：${WHITE_RATIO}%"
+            echo "来源列表：${#urls[@]} 个"
             echo ""
             cat tmp/all_deduped.txt
           } > dist/AdGuardHome.txt
