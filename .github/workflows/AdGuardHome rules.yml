@@ -61,11 +61,13 @@ jobs:
 
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
 
+          # ⏰ 使用北京时间
+          TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
+
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
           WHITELIST_COUNT=$(grep -c '^@@||' tmp/all_deduped.txt)
-          TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
           WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
