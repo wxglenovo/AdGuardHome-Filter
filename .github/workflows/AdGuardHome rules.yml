@@ -72,10 +72,12 @@ jobs:
           
           # 排序并按父域排序（去除前缀部分，按主域排序）
           echo "📜 排序白名单规则..." 
-          sed 's/^@@||//' tmp/whitelist.txt | sort -t'.' -k2,2 -k1,1 > dist/whitelist.txt
+          # 保留 @@|| 符号，按父域排序
+          sed 's/^@@||//' tmp/whitelist.txt | sort -t'.' -k2,2 -k1,1 | sed 's/^/@@||/' > dist/whitelist.txt
           
           echo "📜 排序黑名单规则..." 
-          sed 's/^||//' tmp/blocklist.txt | sort -t'.' -k2,2 -k1,1 > dist/blocklist.txt
+          # 保留 || 符号，按父域排序
+          sed 's/^||//' tmp/blocklist.txt | sort -t'.' -k2,2 -k1,1 | sed 's/^/||/' > dist/blocklist.txt
 
       - name: Commit Changes
         id: commit
