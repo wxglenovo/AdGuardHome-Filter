@@ -1,32 +1,12 @@
-name: Build AdGuardHome Rules
+      - name: Build AdGuardHome Rules
 
-on:
-  schedule:
-    - cron: "0 0 * * *"
-    - cron: "0 6 * * *"
-    - cron: "0 12 * * *"
-    - cron: "0 18 * * *"
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download & Merge Rules (Clean + Deduplicate + Whitelist Priority)
-        run: |
           mkdir -p dist tmp
+          > tmp/all_raw.txt
 
           urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
-            "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/AdGuard%20Home_Allowlist.txt"
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/AdGuard%20Home_Blacklist.txt"
+            "https://raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/main/fqnovel-fxxk_ads"
             "https://anti-ad.net/easylist.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
             "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
@@ -37,17 +17,14 @@ jobs:
             "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
             "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
             "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
-            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"            
+            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/main/AdGuardHome.txt"
           )
 
           echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            if curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt; then
-              echo "" >> tmp/all_raw.txt
-            else
-              echo "⚠️ Failed to download $url, skipped"
-            fi
+            curl -sSL --retry 3 "$url" >> tmp/all_raw.txt || echo "⚠️ Failed to download $url, skipped" >> tmp/all_raw.txt
+            echo "" >> tmp/all_raw.txt
           done
 
           echo "🧹 清理注释、空行，同时删除无用规则..."
@@ -60,8 +37,8 @@ jobs:
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
           # ✅ wxglenovo 白名单靠前
-          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
-            | grep '^@@||' > tmp/source_whitelist.txt
+          curl -sSL --retry 3 "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+            | grep '^@@||' > tmp/source_whitelist.txt || echo "⚠️ Failed to download wxglenovo whitelist, skipped"
 
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
@@ -98,61 +75,3 @@ jobs:
           } > dist/AdGuardHome.txt
 
           echo "$DEDUP_COUNT" > dist/line_count.txt
-
-      - name: Commit Changes
-        id: commit
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          PREV_COUNT=$(git show origin/main:dist/line_count.txt 2>/dev/null || echo 0)
-          NEW_COUNT=$(cat dist/line_count.txt)
-          NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
-          [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
-          DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
-          COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
-
-          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
-
-          if git diff --cached --quiet; then
-            echo "no_change=true" >> $GITHUB_OUTPUT
-            echo "No new rules to commit"
-          else
-            echo "no_change=false" >> $GITHUB_OUTPUT
-            echo "$COMMIT_MSG"
-            git commit -m "$COMMIT_MSG"
-            git pull --rebase origin main || true
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
-            echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-            echo "new_count=$NEW_COUNT" >> $GITHUB_OUTPUT
-            echo "new_added=$NEW_ADDED" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create or Update Release
-        if: steps.commit.outputs.no_change == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ github.run_number }}"
-          name: "🧩 AdGuardHome Rules"
-          body: |
-            ${{ steps.commit.outputs.commit_message }}
-            ---
-            📦 文件名：AdGuardHome.txt
-            📊 总行数：${{ steps.commit.outputs.new_count }}
-            ➕ 新增：${{ steps.commit.outputs.new_added }} 条
-          files: |
-            dist/AdGuardHome.txt
-            dist/old_rules.txt
-
-      - name: Show Result
-        run: |
-          echo "================= ✅ 合并完成 ================="
-          cat dist/old_rules.txt
-          echo "------------------------------------------------------------"
-          echo "📁 文件路径：dist/AdGuardHome.txt"
-          echo "📊 总行数：$(wc -l < dist/AdGuardHome.txt)"
-          echo "------------------------------------------------------------"
-          echo "前 20 行示例："
-          head -n 20 dist/AdGuardHome.txt
-          echo "============================================================"
