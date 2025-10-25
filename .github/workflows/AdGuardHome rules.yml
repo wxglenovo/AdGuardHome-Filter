@@ -19,94 +19,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts + Whitelist First)
+      - name: Download & Merge Rules (Clean + Deduplicate)
         run: |
           mkdir -p dist tmp
-
-          urls=( 
+          urls=(
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
             "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
             "https://www.i-dont-care-about-cookies.eu/abp/"
             "https://anti-ad.net/easylist.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
             "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
-            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
-            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
-            "https://easylist-downloads.adblockplus.org/easylist.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
+            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"            
+            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"            
+            "https://easylist-downloads.adblockplus.org/easylistchina.txt"            
+            "https://easylist-downloads.adblockplus.org/easylist.txt"            
+            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"  
             "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
+            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
             "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"  # 新增的白名单
           )
-
           echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
-
           echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
-
-          # 检查 cleaned 文件是否为空
-          if [ ! -s tmp/all_cleaned.txt ]; then
-            echo "Error: No data in the file tmp/all_cleaned.txt"
-            exit 1
-          fi
-
-          echo "📊 去重..."
-          # 输出调试信息，查看去重前的内容
-          echo "Debug: Contents of tmp/all_cleaned.txt before deduplication:"
-          cat tmp/all_cleaned.txt
-
+          echo "📊 去重并排序白名单..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
-          
-          # 检查 sort 和 uniq 命令是否成功
-          if [ $? -ne 0 ]; then
-            echo "Error: De-duplication failed"
-            exit 1
-          fi
-
-          echo "去重完成"
-
-          # 分离白名单和黑名单
+          # ✅ 将 wxglenovo 的白名单放最前
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
-
-          # 提取域名部分用于冲突检测
-          sed 's/^@@||//' tmp/whitelist.txt > tmp/whitelist_domains.txt
-          sed 's/^||//' tmp/blocklist.txt > tmp/blocklist_domains.txt
-
-          # 找出冲突域名（黑白名单互相抵消）
-          comm -12 <(sort tmp/whitelist_domains.txt) <(sort tmp/blocklist_domains.txt) > tmp/conflicts.txt
-          CONFLICT_COUNT=$(wc -l < tmp/conflicts.txt)
-
-          # 删除冲突条目
-          grep -Fv -f tmp/conflicts.txt tmp/whitelist.txt > tmp/whitelist_cleaned.txt
-          grep -Fv -f tmp/conflicts.txt tmp/blocklist.txt > tmp/blocklist_cleaned.txt
-
-          # 合并最终规则并去重
-          cat tmp/whitelist_cleaned.txt tmp/blocklist_cleaned.txt | sort | uniq > tmp/all_deduped.txt
-
+          # ✅ wxglenovo 源内白名单优先置顶
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+            | grep '^@@||' > tmp/source_whitelist.txt
+          cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
           # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
-
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
           WHITELIST_COUNT=$(grep -c '^@@||' tmp/all_deduped.txt)
           WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
-
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
           echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
-          echo "黑白名单互相抵消条数：$CONFLICT_COUNT" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
-
           {
             echo "! ================================================================"
             echo "! 🧩 AdGuardHome 规则合并结果"
@@ -116,17 +78,15 @@ jobs:
             echo "! 去重条数：$DUP_COUNT"
             echo "! 白名单条数：$WHITELIST_COUNT"
             echo "! 白名单比例：${WHITE_RATIO}%"
-            echo "! 黑白名单互相抵消条数：$CONFLICT_COUNT"
             echo "! 来源列表：${#urls[@]} 个"
             echo "! ================================================================"
             echo ""
             echo "📜 白名单规则:"
-            cat tmp/whitelist_cleaned.txt
+            cat tmp/whitelist.txt
             echo "------------------------------------------------------------"
             echo "📜 黑名单规则:"
-            cat tmp/blocklist_cleaned.txt
-          } > dist/old_rules.txt
-
+            cat tmp/blocklist.txt
+          } > dist/AdGuardHome.txt
           echo "$DEDUP_COUNT" > dist/line_count.txt
 
       - name: Commit Changes
@@ -134,18 +94,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           PREV_COUNT=$(git show origin/main:dist/line_count.txt 2>/dev/null || echo 0)
           NEW_COUNT=$(cat dist/line_count.txt)
           NEW_ADDED=$((NEW_COUNT - PREV_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
           DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
-
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
-
-          git add dist/old_rules.txt dist/line_count.txt dist/whitelist_cleaned.txt dist/blocklist_cleaned.txt
-
+          git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt dist/line_count.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -169,24 +124,27 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
             ---
-            📦 文件名：whitelist_cleaned.txt  
-            📊 总行数：${{ steps.commit.outputs.new_count }}  
+            📦 文件名：whitelist.txt 和 blocklist.txt  
+            📊 白名单总行数：${{ steps.commit.outputs.new_count }}  
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
-            dist/whitelist_cleaned.txt
-            dist/blocklist_cleaned.txt
+            dist/whitelist.txt
+            dist/blocklist.txt
 
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
           echo "------------------------------------------------------------"
-          echo "📁 白名单文件路径：dist/whitelist_cleaned.txt"
-          echo "📊 白名单总行数：$(wc -l < dist/whitelist_cleaned.txt)"
+          echo "📁 白名单文件路径：dist/whitelist.txt"
+          echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
           echo "------------------------------------------------------------"
-          echo "📁 黑名单文件路径：dist/blocklist_cleaned.txt"
-          echo "📊 黑名单总行数：$(wc -l < dist/blocklist_cleaned.txt)"
+          echo "📁 黑名单文件路径：dist/blocklist.txt"
+          echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
           echo "------------------------------------------------------------"
-          echo "前 20 行示例："
-          head -n 20 dist/whitelist_cleaned.txt
+          echo "前 20 行白名单示例："
+          head -n 20 dist/whitelist.txt
+          echo "------------------------------------------------------------"
+          echo "前 20 行黑名单示例："
+          head -n 20 dist/blocklist.txt
           echo "============================================================"
