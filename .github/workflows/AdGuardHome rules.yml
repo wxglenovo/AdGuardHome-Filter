@@ -19,25 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts + Parent Domain Only)
+      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts + Whitelist First)
         run: |
           mkdir -p dist tmp
 
-          urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
-            "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
-            "https://www.i-dont-care-about-cookies.eu/abp/"
-            "https://anti-ad.net/easylist.txt"
-            "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
-            "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
-            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
-            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
-            "https://easylist-downloads.adblockplus.org/easylist.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
-            "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
-            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
-          )
+          urls=(...your URLs...)
 
           echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
@@ -62,9 +48,11 @@ jobs:
           # 合并白名单，优先 wxglenovo 白名单
           cat tmp/source_whitelist.txt tmp/whitelist.txt > tmp/whitelist_combined.txt
 
-          # 检测黑白名单冲突
+          # 提取域名部分用于冲突检测
           sed 's/^@@||//' tmp/whitelist_combined.txt > tmp/whitelist_domains.txt
           sed 's/^||//' tmp/blocklist.txt > tmp/blocklist_domains.txt
+
+          # 找出冲突域名（黑白名单互相抵消）
           comm -12 <(sort tmp/whitelist_domains.txt) <(sort tmp/blocklist_domains.txt) > tmp/conflicts.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflicts.txt)
 
@@ -72,42 +60,8 @@ jobs:
           grep -Fv -f tmp/conflicts.txt tmp/whitelist_combined.txt > tmp/whitelist_cleaned.txt
           grep -Fv -f tmp/conflicts.txt tmp/blocklist.txt > tmp/blocklist_cleaned.txt
 
-          # 函数：保留父域，删除子域（二级域名以上）
-          process_domains() {
-              input_file=$1
-              output_file=$2
-
-              # 提取域名
-              sed 's/^@@||//' "$input_file" | sed 's/^||//' > tmp/domains.txt
-              awk -F. 'NF>=2' tmp/domains.txt > tmp/domains_filtered.txt
-
-              # 按级数降序（父域先）
-              awk -F. '{print NF, $0}' tmp/domains_filtered.txt | sort -nr | cut -d' ' -f2- > tmp/domains_sorted.txt
-
-              > tmp/domains_final.txt
-              while read domain; do
-                  keep=true
-                  for parent in $(cat tmp/domains_final.txt); do
-                      if [[ "$domain" == *".${parent}" ]]; then
-                          keep=false
-                          break
-                      fi
-                  done
-                  $keep && echo "$domain" >> tmp/domains_final.txt
-              done < tmp/domains_sorted.txt
-
-              # 恢复前缀
-              prefix=$(head -n1 "$input_file" | grep -q '^@@||' && echo '@@||' || echo '||')
-              sed "s/^/${prefix}/" tmp/domains_final.txt > "$output_file"
-          }
-
-          # 应用到白名单
-          process_domains tmp/whitelist_cleaned.txt tmp/whitelist_final.txt
-          # 应用到黑名单
-          process_domains tmp/blocklist_cleaned.txt tmp/blocklist_final.txt
-
           # 合并最终规则并去重
-          cat tmp/whitelist_final.txt tmp/blocklist_final.txt | sort | uniq > tmp/all_deduped.txt
+          cat tmp/whitelist_cleaned.txt tmp/blocklist_cleaned.txt | sort | uniq > tmp/all_deduped.txt
 
           # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
@@ -139,7 +93,11 @@ jobs:
             echo "! 来源列表：${#urls[@]} 个"
             echo "! ================================================================"
             echo ""
-            cat tmp/all_deduped.txt
+            echo "📜 白名单规则:"
+            cat tmp/whitelist_cleaned.txt
+            echo "------------------------------------------------------------"
+            echo "📜 黑名单规则:"
+            cat tmp/blocklist_cleaned.txt
           } > dist/AdGuardHome.txt
 
           echo "$DEDUP_COUNT" > dist/line_count.txt
@@ -159,7 +117,7 @@ jobs:
 
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
-          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
+          git add dist/old_rules.txt dist/line_count.txt dist/whitelist_cleaned.txt dist/blocklist_cleaned.txt
 
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
@@ -184,21 +142,24 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
             ---
-            📦 文件名：AdGuardHome.txt  
+            📦 文件名：whitelist_cleaned.txt  
             📊 总行数：${{ steps.commit.outputs.new_count }}  
             ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
-            dist/AdGuardHome.txt
-            dist/old_rules.txt
+            dist/whitelist_cleaned.txt
+            dist/blocklist_cleaned.txt
 
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
           echo "------------------------------------------------------------"
-          echo "📁 文件路径：dist/AdGuardHome.txt"
-          echo "📊 总行数：$(wc -l < dist/AdGuardHome.txt)"
+          echo "📁 白名单文件路径：dist/whitelist_cleaned.txt"
+          echo "📊 白名单总行数：$(wc -l < dist/whitelist_cleaned.txt)"
+          echo "------------------------------------------------------------"
+          echo "📁 黑名单文件路径：dist/blocklist_cleaned.txt"
+          echo "📊 黑名单总行数：$(wc -l < dist/blocklist_cleaned.txt)"
           echo "------------------------------------------------------------"
           echo "前 20 行示例："
-          head -n 20 dist/AdGuardHome.txt
+          head -n 20 dist/whitelist_cleaned.txt
           echo "============================================================"
