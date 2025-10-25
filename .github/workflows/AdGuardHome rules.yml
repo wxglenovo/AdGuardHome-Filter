@@ -50,9 +50,10 @@ jobs:
             fi
           done
 
-          echo "🧹 清理注释、空行，同时删除所有 $ 开头的规则..."
+          echo "🧹 清理注释、空行，同时删除 $ 开头和无用规则..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
             | grep -v '^\$' \
+            | grep -v -E '%2Fevent.gif%3F|%2Fo.gif&|%2Fopen.aspx%3F|%2Frw%2Fbeacon_|&&sub19=undefined|&&sub20=undefined|&EventType=DataDealImpression|&EventType=Impression|&action=js_stats|&ad\*|&puid=\*|&uid=\*=show|&ad=\*|&referer=|&adb=y|&adid=|&cbiframe=|&cx=c&gtm=|&ep.analytics_storage=|&ev=PageView|&event_name=page_view|&event_name=view_item_list|&fp_sid=pop\$popup|&ga_blocked=|&hitType=pageview|&http_referer=|&l=dataLayer&cx=c|&pagegroup=|&url=|&popunder=|&popundersPerIP=|&rb=&uuid=|&refer=http|&sadbl=1|&chu=|&sseq=|&dseq=|&sst.sw_exp=|&subaffid=|&t=pageview|&xhtml\?|&zoneid=|*\$app=com.miui.systemAdSolution|\*-stats.jpush.cn\^|*.com/css/showfloatdiv\^|*/\?tzbilibili|*/ad\.|*/adbox/|*/adload\.|*/ads\.|*/adsense/' \
             | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重并排序..."
