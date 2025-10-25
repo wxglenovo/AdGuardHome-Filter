@@ -50,8 +50,10 @@ jobs:
             fi
           done
 
-          echo "🧹 清理注释、系统提示与空行..."
-          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
+          echo "🧹 清理注释、空行，同时删除以 $$ 开头的隐藏元素规则..."
+          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
+            | grep -v '^\$\$' \
+            | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重并排序..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
