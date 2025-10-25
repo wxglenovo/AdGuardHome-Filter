@@ -50,11 +50,9 @@ jobs:
             fi
           done
 
-          echo "🧹 清理注释、空行，同时删除 $$、$csp= 和 $domain= 开头的规则..."
+          echo "🧹 清理注释、空行，同时删除所有 $ 开头的规则..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
-            | grep -v '^\$\$' \
-            | grep -v '^\$csp=' \
-            | grep -v '^\$domain=' \
+            | grep -v '^\$' \
             | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重并排序..."
