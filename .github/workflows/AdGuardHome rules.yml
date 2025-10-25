@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + CDN Compress)
+      - name: Download & Merge Rules (Clean + Deduplicate + Whitelist Priority)
         run: |
           mkdir -p dist tmp
 
@@ -66,30 +66,6 @@ jobs:
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
-
-          echo "🌐 正在压缩相似 CDN 域名为泛域名规则..."
-          awk '
-            /^(\|\|[^\/\^]+\.[a-z]+)\^$/ {
-              full=$0
-              domain=$0
-              gsub(/^\|\|/,"",domain)
-              gsub(/\^$/,"",domain)
-              split(domain, parts, ".")
-              first=parts[1]
-              if (first ~ /^(cdn|cdn\d+|pull-|push-|img-|hcdnv|hdcdnv|hwcdn|bytecdn|alicdn|cloudfront|akamai|fastly|gslb|edgekey|hwcloud|cdnhwc2|cache|static)/) {
-                base=""
-                for (i=2; i<=length(parts); i++) base=base"."parts[i]
-                sub(/^\./,"",base)
-                print "||*."base"^"
-              } else {
-                print full
-              }
-              next
-            }
-            {print $0}
-          ' tmp/all_deduped.txt | sort -u > tmp/all_compressed.txt
-
-          mv tmp/all_compressed.txt tmp/all_deduped.txt
 
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
