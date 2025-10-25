@@ -1,4 +1,4 @@
-name: Build AdGuardHome Rules
+name: Build AdGuardHome rules
 
 on:
   schedule:
@@ -19,53 +19,52 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Whitelist Priority)
+      - name: Download & Merge Rules (Clean + Deduplicate)
         run: |
           mkdir -p dist tmp
 
           urls=(
-            "https://ghproxy.com/raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/main/fqnovel-fxxk_ads"
-            "https://ghproxy.com/raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
-            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
-            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
-            "https://easylist-downloads.adblockplus.org/easylist.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/main/AdGuardHome.txt"
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
+            "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
+            "https://www.i-dont-care-about-cookies.eu/abp/"
+            "https://anti-ad.net/easylist.txt"
+            "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
+            "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
+            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"            
+            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"            
+            "https://easylist-downloads.adblockplus.org/easylistchina.txt"            
+            "https://easylist-downloads.adblockplus.org/easylist.txt"            
+            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"  
+            "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
+            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
           )
 
           echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            if curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt; then
-              echo "" >> tmp/all_raw.txt
-            else
-              echo "⚠️ Failed to download $url, skipped"
-            fi
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            echo "" >> tmp/all_raw.txt
           done
 
-          echo "🧹 清理注释、空行，同时删除无用规则..."
-          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
-            | grep -v '^\$' \
-            | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
+          echo "🧹 清理注释、系统提示与空行..."
+          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序..."
+          echo "📊 去重并排序白名单..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
-          # ✅ wxglenovo 白名单靠前
-          curl -sSL --retry 3 --fail "https://ghproxy.com/raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
-            | grep '^@@||' > tmp/source_whitelist.txt
-
+          # ✅ 将 wxglenovo 的白名单放最前
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
+          # ✅ wxglenovo 源内白名单优先置顶
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+            | grep '^@@||' > tmp/source_whitelist.txt
+
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
 
+          # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
+
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
@@ -108,6 +107,7 @@ jobs:
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
 
           DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
+
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
           git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
@@ -135,9 +135,9 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
             ---
-            📦 文件名：AdGuardHome.txt
-            📊 总行数：${{ steps.commit.outputs.new_count }}
-            ➕ 新增：${{ steps.commit.outputs.new_added }} 条
+            📦 文件名：AdGuardHome.txt  
+            📊 总行数：${{ steps.commit.outputs.new_count }}  
+            ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
           files: |
             dist/AdGuardHome.txt
             dist/old_rules.txt
