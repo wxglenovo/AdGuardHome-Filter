@@ -50,10 +50,10 @@ jobs:
             fi
           done
 
-          echo "🧹 清理注释、空行，同时删除 $ 开头和无用规则..."
+          echo "🧹 清理注释、空行，同时删除无用规则..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
             | grep -v '^\$' \
-            | grep -v -E '%2Fevent.gif%3F|%2Fo.gif&|%2Fopen.aspx%3F|%2Frw%2Fbeacon_|&&sub19=undefined|&&sub20=undefined|&EventType=DataDealImpression|&EventType=Impression|&action=js_stats|&ad\*|&puid=\*|&uid=\*=show|&ad=\*|&referer=|&adb=y|&adid=|&cbiframe=|&cx=c&gtm=|&ep.analytics_storage=|&ev=PageView|&event_name=page_view|&event_name=view_item_list|&fp_sid=pop\$popup|&ga_blocked=|&hitType=pageview|&http_referer=|&l=dataLayer&cx=c|&pagegroup=|&url=|&popunder=|&popundersPerIP=|&rb=&uuid=|&refer=http|&sadbl=1|&chu=|&sseq=|&dseq=|&sst.sw_exp=|&subaffid=|&t=pageview|&xhtml\?|&zoneid=|*\$app=com.miui.systemAdSolution|\*-stats.jpush.cn\^|*.com/css/showfloatdiv\^|*/\?tzbilibili|*/ad\.|*/adbox/|*/adload\.|*/ads\.|*/adsense/' \
+            | grep -v -E '%2Fevent.gif%3F|%2Fo.gif&|%2Fopen.aspx%3F|%2Frw%2Fbeacon_|&&sub19=undefined|&&sub20=undefined|&EventType=DataDealImpression|&EventType=Impression|&action=js_stats|&ad\*|&puid=\*|&uid=\*=show|&ad=\*|&referer=|&adb=y|&adid=|&cbiframe=|&cx=c&gtm=|&ep.analytics_storage=|&ev=PageView|&event_name=page_view|&event_name=view_item_list|&fp_sid=pop\$popup|&ga_blocked=|&hitType=pageview|&http_referer=|&l=dataLayer&cx=c|&pagegroup=|&url=|&popunder=|&popundersPerIP=|&rb=&uuid=|&refer=http|&sadbl=1|&chu=|&sseq=|&dseq=|&sst.sw_exp=|&subaffid=|&t=pageview|&xhtml\?|&zoneid=|*\$app=com.miui.systemAdSolution|\*-stats.jpush.cn\^|*.com/css/showfloatdiv\^|*/\?tzbilibili|*/ad\.|*/adbox/|*/adload\.|*/ads\.|*/adsense/|*/html/click/|*/mediaController|*/piaofu\.|*/piaofu/|*/redirect\?ad_cb=|*/svnad/|\*ContentAD\.|\*H5Logic_|-468x60_|-468x70\.|-468x80-\$image|-468x80\.|-468x80/|-468x80_|-468x90\.|-480x60-|-480x60\.|-480x60/|-480x60_|-486x60\.|-500x100\.|-600x70\.|-600x90-/' \
             | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重并排序..."
@@ -173,10 +173,4 @@ jobs:
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
-          echo "------------------------------------------------------------"
-          echo "📁 文件路径：dist/AdGuardHome.txt"
-          echo "📊 总行数：$(wc -l < dist/AdGuardHome.txt)"
-          echo "------------------------------------------------------------"
-          echo "前 20 行示例："
-          head -n 20 dist/AdGuardHome.txt
-          echo "============================================================"
+          echo "------------------------------------------------------------
