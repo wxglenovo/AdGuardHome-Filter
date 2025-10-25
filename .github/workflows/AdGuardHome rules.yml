@@ -24,19 +24,18 @@ jobs:
           mkdir -p dist tmp
 
           urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
-            "https://ghproxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
-            "https://anti-ad.net/easylist.txt"
-            "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
-            "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/main/fqnovel-fxxk_ads"
+            "https://ghproxy.com/raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
             "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
             "https://easylist-downloads.adblockplus.org/easylistchina.txt"
             "https://easylist-downloads.adblockplus.org/easylist.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
-            "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
-            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
-            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
+            "https://ghproxy.com/raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/main/AdGuardHome.txt"
           )
 
           echo "📥 开始下载并合并所有规则..."
@@ -52,14 +51,13 @@ jobs:
           echo "🧹 清理注释、空行，同时删除无用规则..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
             | grep -v '^\$' \
-            | grep -v -E '%2Fevent\.gif%3F|%2Fo\.gif&|%2Fopen\.aspx%3F|%2Frw%2Fbeacon_|&&sub19=undefined|&&sub20=undefined|&EventType=DataDealImpression|&EventType=Impression|&action=js_stats|&ad\\*|&puid=\\*|&uid=\\*=show|&ad=\\*|&referer=|&adb=y|&adid=|&cbiframe=|&cx=c&gtm=|&ep.analytics_storage=|&ev=PageView|&event_name=page_view|&event_name=view_item_list|&fp_sid=pop\\$popup|&ga_blocked=|&hitType=pageview|&http_referer=|&l=dataLayer&cx=c|&pagegroup=|&url=|&popunder=|&popundersPerIP=|&rb=&uuid=|&refer=http|&sadbl=1|&chu=|&sseq=|&dseq=|&sst.sw_exp=|&subaffid=|&t=pageview|&xhtml\\?|&zoneid=|\\*\\$app=com\.miui\.systemAdSolution|\\*\\-stats\.jpush\.cn\^|\\*\.com/css/showfloatdiv\^|\\*/\?tzbilibili|\\*/ad\.|\\*/adbox/|\\*/adload\.|\\*/ads\.|\\*/adsense/|\\*/html/click/|\\*/mediaController|\\*/piaofu\.|\\*/piaofu/|\\*/redirect\?ad_cb=|\\*/svnad/|\\*ContentAD\.|\\*H5Logic_|-468x60_|-468x70\.|-468x80-\$image|-468x80\.|-468x80/|-468x80_|-468x90\.|-480x60-|-480x60\.|-480x60/|-480x60_|-486x60\.|-500x100\.|-600x70\.|-600x90-/' \
             | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重并排序..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
           # ✅ wxglenovo 白名单靠前
-          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+          curl -sSL --retry 3 --fail "https://ghproxy.com/raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
