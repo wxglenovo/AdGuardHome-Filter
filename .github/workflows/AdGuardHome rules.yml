@@ -19,14 +19,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + CDN Compress + Remove $$)
+      - name: Download & Merge Rules (Clean + Deduplicate + CDN Compress)
         run: |
           mkdir -p dist tmp
 
           urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home-Filtering-Rule.txt"
-            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
-            "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
+            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/main/AdGuardHome.txt"
+            "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/main/fqnovel-fxxk_ads"
             "https://www.i-dont-care-about-cookies.eu/abp/"
             "https://anti-ad.net/easylist.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
@@ -43,8 +43,11 @@ jobs:
           echo "📥 开始下载并合并所有规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
-            echo "" >> tmp/all_raw.txt
+            if curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt; then
+              echo "" >> tmp/all_raw.txt
+            else
+              echo "⚠️ Failed to download $url, skipped"
+            fi
           done
 
           echo "🧹 清理注释、系统提示与空行..."
@@ -58,7 +61,7 @@ jobs:
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
           # wxglenovo 源白名单优先
-          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home-Filtering-Rule.txt" \
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
@@ -104,7 +107,6 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          # 输出最终规则文件，去掉 $$ 开头行
           {
             echo "! ================================================================"
             echo "! 🧩 AdGuardHome 规则合并结果"
@@ -117,11 +119,8 @@ jobs:
             echo "! 来源列表：${#urls[@]} 个"
             echo "! ================================================================"
             echo ""
-            grep -v '^\$\$' tmp/all_deduped.txt
+            cat tmp/all_deduped.txt
           } > dist/AdGuardHome.txt
-
-          # 保留完整备份文件
-          cp tmp/all_deduped.txt dist/AdGuardHome_full.txt
 
           echo "$DEDUP_COUNT" > dist/line_count.txt
 
@@ -140,7 +139,7 @@ jobs:
 
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
-          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt dist/AdGuardHome_full.txt
+          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
 
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
