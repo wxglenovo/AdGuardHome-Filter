@@ -100,7 +100,13 @@ jobs:
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
           DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
+          
+          # 确保文件已经生成
+          ls dist/
+          
+          # 确保文件路径正确
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt dist/line_count.txt
+
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -148,3 +154,4 @@ jobs:
           echo "前 20 行黑名单示例："
           head -n 20 dist/blocklist.txt
           echo "============================================================"
+  
