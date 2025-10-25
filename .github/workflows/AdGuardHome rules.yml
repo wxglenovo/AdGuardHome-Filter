@@ -19,12 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts)
+      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts + Whitelist First)
         run: |
           mkdir -p dist tmp
 
           urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
             "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
             "https://www.i-dont-care-about-cookies.eu/abp/"
@@ -57,18 +56,22 @@ jobs:
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
+          # 下载 wxglenovo 白名单并放前面
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt" > tmp/source_whitelist.txt
+
+          # 合并白名单，优先 wxglenovo 白名单
+          cat tmp/source_whitelist.txt tmp/whitelist.txt > tmp/whitelist_combined.txt
+
           # 提取域名部分用于冲突检测
-          sed 's/^@@||//' tmp/whitelist.txt > tmp/whitelist_domains.txt
+          sed 's/^@@||//' tmp/whitelist_combined.txt > tmp/whitelist_domains.txt
           sed 's/^||//' tmp/blocklist.txt > tmp/blocklist_domains.txt
 
-          # 找出冲突域名（同时出现在白名单和黑名单）
+          # 找出冲突域名（黑白名单互相抵消）
           comm -12 <(sort tmp/whitelist_domains.txt) <(sort tmp/blocklist_domains.txt) > tmp/conflicts.txt
-
-          # 统计冲突数量
           CONFLICT_COUNT=$(wc -l < tmp/conflicts.txt)
 
           # 删除冲突条目
-          grep -Fv -f tmp/conflicts.txt tmp/whitelist.txt > tmp/whitelist_cleaned.txt
+          grep -Fv -f tmp/conflicts.txt tmp/whitelist_combined.txt > tmp/whitelist_cleaned.txt
           grep -Fv -f tmp/conflicts.txt tmp/blocklist.txt > tmp/blocklist_cleaned.txt
 
           # 合并最终规则并去重
