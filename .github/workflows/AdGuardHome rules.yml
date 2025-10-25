@@ -1,4 +1,4 @@
-name: Build AdGuardHome rules
+name: Build AdGuardHome Rules
 
 on:
   schedule:
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate)
+      - name: Download & Merge Rules (Clean + Deduplicate + CDN Compress)
         run: |
           mkdir -p dist tmp
 
@@ -31,11 +31,11 @@ jobs:
             "https://anti-ad.net/easylist.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
             "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"            
-            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"            
-            "https://easylist-downloads.adblockplus.org/easylistchina.txt"            
-            "https://easylist-downloads.adblockplus.org/easylist.txt"            
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"  
+            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
+            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
+            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
+            "https://easylist-downloads.adblockplus.org/easylist.txt"
+            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
             "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
             "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
           )
@@ -50,18 +50,46 @@ jobs:
           echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序白名单..."
+          echo "📊 去重并排序..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
-          # ✅ 将 wxglenovo 的白名单放最前
+          # ✅ 将 wxglenovo 白名单放最前
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ wxglenovo 源内白名单优先置顶
+          # ✅ wxglenovo 源白名单优先
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
+
+          # 🌐 CDN 域名压缩逻辑
+          echo "🌐 正在压缩相似 CDN 域名为泛域名规则..."
+          awk '
+            # 匹配标准规则 ||domain.com^
+            /^(\|\|[^\/\^]+\.[a-z]+)\^$/ {
+              full=$0
+              domain=$0
+              gsub(/^\|\|/,"",domain)
+              gsub(/\^$/,"",domain)
+              # 拆分域名
+              split(domain, parts, ".")
+              first=parts[1]
+              if (first ~ /^(cdn|cdn\d+|pull-|push-|img-|hcdnv|hdcdnv|hwcdn|bytecdn|alicdn|cloudfront|akamai|fastly|gslb|edgekey|hwcloud|cdnhwc2|cache|static)/) {
+                base=""
+                for (i=2; i<=length(parts); i++) base=base"."parts[i]
+                sub(/^\./,"",base)
+                print "||*."base"^"
+              } else {
+                print full
+              }
+              next
+            }
+            # 其他非标准行保留
+            {print $0}
+          ' tmp/all_deduped.txt | sort -u > tmp/all_compressed.txt
+
+          mv tmp/all_compressed.txt tmp/all_deduped.txt
 
           # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
