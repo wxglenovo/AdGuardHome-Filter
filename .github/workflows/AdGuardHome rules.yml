@@ -50,25 +50,25 @@ jobs:
             fi
           done
 
-          echo "🧹 清理注释、空行，同时删除以 $$ 开头的隐藏元素规则..."
+          echo "🧹 清理注释、空行，同时删除 $$、$csp= 和 $domain= 开头的规则..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt \
             | grep -v '^\$\$' \
+            | grep -v '^\$csp=' \
+            | grep -v '^\$domain=' \
             | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重并排序..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
-          # 将 wxglenovo 白名单放最前
-          grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
-          grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
-
-          # wxglenovo 源白名单优先
+          # ✅ wxglenovo 白名单靠前
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
+          grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
+          grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
+
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
 
-          # CDN 域名压缩逻辑
           echo "🌐 正在压缩相似 CDN 域名为泛域名规则..."
           awk '
             /^(\|\|[^\/\^]+\.[a-z]+)\^$/ {
@@ -93,9 +93,7 @@ jobs:
 
           mv tmp/all_compressed.txt tmp/all_deduped.txt
 
-          # 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
-
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
@@ -138,7 +136,6 @@ jobs:
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
 
           DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
-
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
           git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
