@@ -19,12 +19,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts + Whitelist First)
+      - name: Download & Merge Rules (Clean + Deduplicate + Remove Conflicts + Parent Domain Only)
         run: |
           mkdir -p dist tmp
 
           urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"            
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
             "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
             "https://www.i-dont-care-about-cookies.eu/abp/"
@@ -63,11 +62,9 @@ jobs:
           # 合并白名单，优先 wxglenovo 白名单
           cat tmp/source_whitelist.txt tmp/whitelist.txt > tmp/whitelist_combined.txt
 
-          # 提取域名部分用于冲突检测
+          # 检测黑白名单冲突
           sed 's/^@@||//' tmp/whitelist_combined.txt > tmp/whitelist_domains.txt
           sed 's/^||//' tmp/blocklist.txt > tmp/blocklist_domains.txt
-
-          # 找出冲突域名（黑白名单互相抵消）
           comm -12 <(sort tmp/whitelist_domains.txt) <(sort tmp/blocklist_domains.txt) > tmp/conflicts.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflicts.txt)
 
@@ -75,8 +72,42 @@ jobs:
           grep -Fv -f tmp/conflicts.txt tmp/whitelist_combined.txt > tmp/whitelist_cleaned.txt
           grep -Fv -f tmp/conflicts.txt tmp/blocklist.txt > tmp/blocklist_cleaned.txt
 
+          # 函数：保留父域，删除子域（二级域名以上）
+          process_domains() {
+              input_file=$1
+              output_file=$2
+
+              # 提取域名
+              sed 's/^@@||//' "$input_file" | sed 's/^||//' > tmp/domains.txt
+              awk -F. 'NF>=2' tmp/domains.txt > tmp/domains_filtered.txt
+
+              # 按级数降序（父域先）
+              awk -F. '{print NF, $0}' tmp/domains_filtered.txt | sort -nr | cut -d' ' -f2- > tmp/domains_sorted.txt
+
+              > tmp/domains_final.txt
+              while read domain; do
+                  keep=true
+                  for parent in $(cat tmp/domains_final.txt); do
+                      if [[ "$domain" == *".${parent}" ]]; then
+                          keep=false
+                          break
+                      fi
+                  done
+                  $keep && echo "$domain" >> tmp/domains_final.txt
+              done < tmp/domains_sorted.txt
+
+              # 恢复前缀
+              prefix=$(head -n1 "$input_file" | grep -q '^@@||' && echo '@@||' || echo '||')
+              sed "s/^/${prefix}/" tmp/domains_final.txt > "$output_file"
+          }
+
+          # 应用到白名单
+          process_domains tmp/whitelist_cleaned.txt tmp/whitelist_final.txt
+          # 应用到黑名单
+          process_domains tmp/blocklist_cleaned.txt tmp/blocklist_final.txt
+
           # 合并最终规则并去重
-          cat tmp/whitelist_cleaned.txt tmp/blocklist_cleaned.txt | sort | uniq > tmp/all_deduped.txt
+          cat tmp/whitelist_final.txt tmp/blocklist_final.txt | sort | uniq > tmp/all_deduped.txt
 
           # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
