@@ -19,12 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + CDN Compress)
+      - name: Download & Merge Rules (Clean + Deduplicate + CDN Compress + Remove $$)
         run: |
           mkdir -p dist tmp
 
           urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt"
+            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home-Filtering-Rule.txt"
             "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
             "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
             "https://www.i-dont-care-about-cookies.eu/abp/"
@@ -53,26 +53,24 @@ jobs:
           echo "📊 去重并排序..."
           sort tmp/all_cleaned.txt | uniq > tmp/all_deduped_tmp.txt
 
-          # ✅ 将 wxglenovo 白名单放最前
+          # 将 wxglenovo 白名单放最前
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ wxglenovo 源白名单优先
-          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+          # wxglenovo 源白名单优先
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home-Filtering-Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | uniq > tmp/all_deduped.txt
 
-          # 🌐 CDN 域名压缩逻辑
+          # CDN 域名压缩逻辑
           echo "🌐 正在压缩相似 CDN 域名为泛域名规则..."
           awk '
-            # 匹配标准规则 ||domain.com^
             /^(\|\|[^\/\^]+\.[a-z]+)\^$/ {
               full=$0
               domain=$0
               gsub(/^\|\|/,"",domain)
               gsub(/\^$/,"",domain)
-              # 拆分域名
               split(domain, parts, ".")
               first=parts[1]
               if (first ~ /^(cdn|cdn\d+|pull-|push-|img-|hcdnv|hdcdnv|hwcdn|bytecdn|alicdn|cloudfront|akamai|fastly|gslb|edgekey|hwcloud|cdnhwc2|cache|static)/) {
@@ -85,13 +83,12 @@ jobs:
               }
               next
             }
-            # 其他非标准行保留
             {print $0}
           ' tmp/all_deduped.txt | sort -u > tmp/all_compressed.txt
 
           mv tmp/all_compressed.txt tmp/all_deduped.txt
 
-          # ⏰ 使用北京时间
+          # 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
@@ -107,6 +104,7 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
+          # 输出最终规则文件，去掉 $$ 开头行
           {
             echo "! ================================================================"
             echo "! 🧩 AdGuardHome 规则合并结果"
@@ -119,8 +117,11 @@ jobs:
             echo "! 来源列表：${#urls[@]} 个"
             echo "! ================================================================"
             echo ""
-            cat tmp/all_deduped.txt
+            grep -v '^\$\$' tmp/all_deduped.txt
           } > dist/AdGuardHome.txt
+
+          # 保留完整备份文件
+          cp tmp/all_deduped.txt dist/AdGuardHome_full.txt
 
           echo "$DEDUP_COUNT" > dist/line_count.txt
 
@@ -139,7 +140,7 @@ jobs:
 
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
 
-          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt
+          git add dist/AdGuardHome.txt dist/old_rules.txt dist/line_count.txt dist/AdGuardHome_full.txt
 
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
@@ -164,9 +165,9 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
             ---
-            📦 文件名：AdGuardHome.txt  
-            📊 总行数：${{ steps.commit.outputs.new_count }}  
-            ➕ 新增：${{ steps.commit.outputs.new_added }} 条  
+            📦 文件名：AdGuardHome.txt
+            📊 总行数：${{ steps.commit.outputs.new_count }}
+            ➕ 新增：${{ steps.commit.outputs.new_added }} 条
           files: |
             dist/AdGuardHome.txt
             dist/old_rules.txt
