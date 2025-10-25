@@ -69,25 +69,15 @@ jobs:
           echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
-          {
-            echo "! ================================================================"
-            echo "! 🧩 AdGuardHome 规则合并结果"
-            echo "! 更新时间：$TIMESTAMP"
-            echo "! 原始规则数：$RAW_COUNT"
-            echo "! 去重后规则数：$DEDUP_COUNT"
-            echo "! 去重条数：$DUP_COUNT"
-            echo "! 白名单条数：$WHITELIST_COUNT"
-            echo "! 白名单比例：${WHITE_RATIO}%"
-            echo "! 来源列表：${#urls[@]} 个"
-            echo "! ================================================================"
-            echo ""
-            echo "📜 白名单规则:"
-            cat tmp/whitelist.txt
-            echo "------------------------------------------------------------"
-            echo "📜 黑名单规则:"
-            cat tmp/blocklist.txt
-          } > dist/AdGuardHome.txt
-          echo "$DEDUP_COUNT" > dist/line_count.txt
+          
+          # 创建单独的白名单和黑名单文件
+          echo "📜 白名单规则:" > dist/whitelist.txt
+          cat tmp/whitelist.txt >> dist/whitelist.txt
+          echo "------------------------------------------------------------" >> dist/whitelist.txt
+
+          echo "📜 黑名单规则:" > dist/blocklist.txt
+          cat tmp/blocklist.txt >> dist/blocklist.txt
+          echo "------------------------------------------------------------" >> dist/blocklist.txt
 
       - name: Commit Changes
         id: commit
@@ -101,7 +91,7 @@ jobs:
           DUP_COUNT=$(grep "重复行数" dist/old_rules.txt | sed 's/[^0-9]*//g')
           COMMIT_MSG="🧩 新增 ${NEW_ADDED} 条 (去重 ${DUP_COUNT} 条, 总数 ${NEW_COUNT})"
           
-          # 确保文件已经生成
+          # 确保文件已生成
           ls dist/
           
           # 确保文件路径正确
@@ -154,4 +144,3 @@ jobs:
           echo "前 20 行黑名单示例："
           head -n 20 dist/blocklist.txt
           echo "============================================================"
-  
