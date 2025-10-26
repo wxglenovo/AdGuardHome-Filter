@@ -1,51 +1,41 @@
-#!/bin/bash
+name: Clean AdGuardHome Rules
 
-# 下载 whitelist.txt 文件
-curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 每天午夜运行
+  workflow_dispatch:         # 支持手动触发
 
-# 创建一个临时文件存储处理结果
-TEMP_FILE="processed_whitelist.txt"
-> $TEMP_FILE  # 清空文件
+permissions:
+  contents: write
 
-# 处理 whitelist.txt 文件
-while IFS= read -r line; do
-    domain=$(echo $line | tr -d '[:space:]')  # 去除空格
+jobs:
+  clean_rules:
+    runs-on: ubuntu-latest
 
-    # 跳过空行
-    if [ -z "$domain" ]; then
-        continue
-    fi
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-    # 分割域名为数组，按 '.' 分隔
-    parts=($(echo "$domain" | tr '.' ' '))
+      - name: Download whitelist.txt
+        run: |
+          curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 
-    # 获取域名的层级数
-    domain_level=${#parts[@]}
+      - name: Process rules to remove redundant subdomains
+        run: |
+          # 读取原始 whitelist.txt
+          cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
+          
+          # 处理规则，保留父域（例如www.example.com -> example.com）
+          awk '{
+            split($1, parts, ".")
+            domain = parts[length(parts)-1] "." parts[length(parts)]
+            print domain
+          }' sorted_whitelist.txt | sort | uniq > final_whitelist.txt
 
-    # 遍历处理已经出现过的父域
-    skip=false
-    for ((i=1; i<$domain_level; i++)); do
-        parent_domain=$(echo "${parts[@]:$i}" | tr ' ' '.')
-        
-        # 如果父域已经存在于临时文件中，跳过该子域
-        if grep -qx "$parent_domain" $TEMP_FILE; then
-            skip=true
-            break
-        fi
-    done
-
-    # 如果没有跳过，加入临时文件
-    if [ "$skip" = false ]; then
-        echo $domain >> $TEMP_FILE
-    fi
-
-done < whitelist.txt
-
-# 输出处理完成的文件
-echo "Processed whitelist.txt saved to $TEMP_FILE"
-cat $TEMP_FILE  # 查看最终结果
-
-# 提交处理后的文件
-git add $TEMP_FILE
-git commit -m "Processed whitelist to remove redundant subdomains"
-git push origin main
+      - name: Commit the cleaned whitelist
+        run: |
+          git config --global user.email "youremail@example.com"
+          git config --global user.name "YourName"
+          git add final_whitelist.txt
+          git commit -m "Cleaned whitelist by removing redundant subdomains"
+          git push
