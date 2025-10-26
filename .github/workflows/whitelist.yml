@@ -1,11 +1,8 @@
-name: Clean AdGuardHome whitelist
+name: Clean AdGuardHome Rules
 
 on:
   schedule:
-    - cron: "0 0,15,30,45 0 * * *"   # 每天 0 点、15 分、30 分、45 分执行
-    - cron: "0 0,15,30,45 6 * * *"   # 每天 6 点、15 分、30 分、45 分执行
-    - cron: "0 0,15,30,45 12 * * *"  # 每天 12 点、15 分、30 分、45 分执行
-    - cron: "0 0,15,30,45 18 * * *"  # 每天 18 点、15 分、30 分、45 分执行
+    - cron: "0 0 * * *"   # 每天午夜运行
   workflow_dispatch:         # 支持手动触发
 
 permissions:
@@ -21,7 +18,7 @@ jobs:
 
       - name: Download whitelist.txt
         run: |
-          echo "下载 whitelist.txt 文件..."
+          echo "开始下载 whitelist.txt 文件..."
           curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
           echo "下载完成！"
 
@@ -30,6 +27,7 @@ jobs:
           echo "开始处理 whitelist.txt 文件..."
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
           
+          # 处理规则，保留父域（例如www.example.com -> example.com）
           deleted_count=0
           temp_file=$(mktemp)
 
@@ -38,7 +36,7 @@ jobs:
           echo -e "# 说明: 删除了冗余的子域，只保留父域" >> $temp_file
           echo -e "# 删除的子域数量: 0" >> $temp_file
 
-          # 遍历并处理每一条域名
+          # 处理每一条域名，去重并删除子域
           while IFS= read -r line; do
             split_line=($(echo $line | tr '.' ' '))
             domain="${split_line[-2]}.${split_line[-1]}"
