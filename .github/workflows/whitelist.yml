@@ -1,4 +1,4 @@
-  name: Clean AdGuardHome whitelist
+name: Clean AdGuardHome whitelist
 
 on:
   schedule:
@@ -21,14 +21,15 @@ jobs:
 
       - name: Download whitelist.txt
         run: |
+          echo "下载 whitelist.txt 文件..."
           curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
+          echo "下载完成！"
 
       - name: Process rules to remove redundant subdomains
         run: |
-          # 读取原始 whitelist.txt
+          echo "开始处理 whitelist.txt 文件..."
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
           
-          # 处理规则，保留父域（例如www.example.com -> example.com）
           deleted_count=0
           temp_file=$(mktemp)
 
@@ -37,6 +38,7 @@ jobs:
           echo -e "# 说明: 删除了冗余的子域，只保留父域" >> $temp_file
           echo -e "# 删除的子域数量: 0" >> $temp_file
 
+          # 遍历并处理每一条域名
           while IFS= read -r line; do
             split_line=($(echo $line | tr '.' ' '))
             domain="${split_line[-2]}.${split_line[-1]}"
@@ -55,11 +57,14 @@ jobs:
           
           # 将处理后的规则写入 final_whitelist.txt
           mv $temp_file final_whitelist.txt
+          echo "处理完成，删除了 $deleted_count 个子域"
 
       - name: Commit the cleaned whitelist
         run: |
+          echo "准备提交更新..."
           git config --global user.email "youremail@example.com"
           git config --global user.name "YourName"
           git add final_whitelist.txt
           git commit -m "Cleaned whitelist by removing redundant subdomains"
           git push
+          echo "提交成功！"
