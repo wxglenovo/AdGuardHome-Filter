@@ -2,7 +2,7 @@ import re
 import requests
 from datetime import datetime
 
-# 获取 GitHub 上的白名单文件 URL
+# 从 GitHub 获取白名单文件
 url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
 
 try:
@@ -10,7 +10,7 @@ try:
     response.raise_for_status()  # 如果请求失败，会抛出异常
     whitelist = response.text.splitlines()
 except requests.RequestException as e:
-    print(f"Error fetching whitelist: {e}")
+    print(f"获取白名单文件时出错: {e}")
     exit(1)
 
 # 用于存储结果
@@ -44,22 +44,22 @@ for line in whitelist:
     else:
         result.add(line)
 
-# 生成文件头部信息
+# 生成文件头部信息（中文）
 header = [
-    "# Cleaned whitelist generated on " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-    "# Original rules count: " + str(len(whitelist)),
-    "# Deleted subdomains count: " + str(deleted_subdomains),
-    "# Processed by GitHub Actions"
+    "# 白名单文件生成时间: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "# 原始规则数量: " + str(len(whitelist)),
+    "# 删除的子域名数量: " + str(deleted_subdomains),
+    "# 由 GitHub Actions 处理生成"
 ]
 
-# 输出新的白名单规则，带上头部信息
+# 输出新的白名单规则，带上中文头部信息
 try:
     with open('cleaned_whitelist.txt', 'w') as f:
         f.write('\n'.join(header) + '\n\n')
         f.write('\n'.join(sorted(result)) + '\n')
 except Exception as e:
-    print(f"Error writing the file: {e}")
+    print(f"写入文件时出错: {e}")
     exit(1)
 
 # 输出删除的子域数量到控制台（可选）
-print(f"Deleted subdomains: {deleted_subdomains}")
+print(f"删除的子域名数量: {deleted_subdomains}")
