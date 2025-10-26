@@ -2,7 +2,8 @@ name: Clean AdGuardHome Rules
 
 on:
   schedule:
-    - cron: "0 0,15,30,45 0 * * *"   # 每天午夜运行（UTC）
+    # 每天 0 点、15 分、30 分、45 分执行（UTC 时区）
+    - cron: "0 0,15,30,45 0 * * *"   # 每天午夜（UTC）
     - cron: "0 0,15,30,45 6 * * *"   # 每天 6 点（UTC）
     - cron: "0 0,15,30,45 12 * * *"  # 每天 12 点（UTC）
     - cron: "0 0,15,30,45 18 * * *"  # 每天 18 点（UTC）
@@ -21,62 +22,21 @@ jobs:
 
       - name: Download whitelist.txt
         run: |
-          echo "开始下载 whitelist.txt 文件..."
           curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
-          echo "下载完成！"
 
       - name: Process rules to remove redundant subdomains
         run: |
-          echo "开始处理 whitelist.txt 文件..."
-          # 检查文件是否成功下载
-          if [[ ! -f whitelist.txt ]]; then
-            echo "whitelist.txt 文件下载失败"
-            exit 1
-          fi
-
-          # 读取原始 whitelist.txt 并去重
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
-          
-          # 检查是否有排序后的文件
-          if [[ ! -f sorted_whitelist.txt ]]; then
-            echo "sorted_whitelist.txt 文件未生成"
-            exit 1
-          fi
-
-          # 处理规则，保留父域（例如www.example.com -> example.com）
           awk '{
             split($1, parts, ".")
             domain = parts[length(parts)-1] "." parts[length(parts)]
             print domain
           }' sorted_whitelist.txt | sort | uniq > final_whitelist.txt
 
-          # 检查 final_whitelist.txt 是否成功生成
-          if [[ ! -f final_whitelist.txt ]]; then
-            echo "final_whitelist.txt 文件未生成"
-            exit 1
-          fi
-
-          echo "处理完成，生成了 final_whitelist.txt"
-
       - name: Commit the cleaned whitelist
         run: |
-          echo "准备提交更新..."
           git config --global user.email "youremail@example.com"
           git config --global user.name "YourName"
-          
-          # 添加所有生成的文件到 Git
-          git add final_whitelist.txt whitelist.txt sorted_whitelist.txt
-          
-          # 检查是否有修改
-          git diff --cached --exit-code
-          if [ $? -eq 0 ]; then
-            echo "没有文件更改，不需要提交"
-            exit 0
-          fi
-
-          # 提交更改
+          git add final_whitelist.txt
           git commit -m "Cleaned whitelist by removing redundant subdomains"
-
-          # 推送更改到远程仓库
           git push
-          echo "提交成功！"
