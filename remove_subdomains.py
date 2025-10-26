@@ -10,6 +10,9 @@ blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/
 # 上次记录的规则数量文件路径
 last_count_file = "last_count.txt"
 
+# 定义需要匹配的规则后缀（例如 '^$generichide'）
+TARGET_SUFFIX = "^$generichide"  # 这里你可以定义任何后缀规则
+
 def fetch_file(url):
     try:
         response = requests.get(url)
@@ -35,20 +38,34 @@ seen_domains_blocklist = {}
 deleted_subdomains_whitelist = 0
 deleted_subdomains_blocklist = 0
 
+# 判断规则是否符合删除子域的条件
+def is_target_rule(rule):
+    return rule.endswith(TARGET_SUFFIX)
+
 # 处理白名单
 for line in whitelist:
     if line.startswith("@@||"):
         domain = line[4:]
         parts = domain.split('.')
-        if len(parts) >= 2:
+        
+        # 如果规则是符合条件的后缀规则，检查后缀并删除子域
+        if is_target_rule(line):
             domain_key = '.'.join(parts[-2:])
+            if domain_key not in seen_domains_whitelist:
+                seen_domains_whitelist[domain_key] = domain
+                result_whitelist.add(f'@@||{domain_key}{TARGET_SUFFIX}')
+            else:
+                deleted_subdomains_whitelist += 1
         else:
-            domain_key = domain
-        if domain_key not in seen_domains_whitelist:
-            seen_domains_whitelist[domain_key] = domain
-            result_whitelist.add(f'@@||{domain_key}')
-        else:
-            deleted_subdomains_whitelist += 1
+            if len(parts) >= 2:
+                domain_key = '.'.join(parts[-2:])
+            else:
+                domain_key = domain
+            if domain_key not in seen_domains_whitelist:
+                seen_domains_whitelist[domain_key] = domain
+                result_whitelist.add(f'@@||{domain_key}')
+            else:
+                deleted_subdomains_whitelist += 1
     else:
         result_whitelist.add(line)
 
@@ -57,15 +74,25 @@ for line in blocklist:
     if line.startswith("||"):
         domain = line[2:]
         parts = domain.split('.')
-        if len(parts) >= 2:
+        
+        # 如果规则是符合条件的后缀规则，检查后缀并删除子域
+        if is_target_rule(line):
             domain_key = '.'.join(parts[-2:])
+            if domain_key not in seen_domains_blocklist:
+                seen_domains_blocklist[domain_key] = domain
+                result_blocklist.add(f'||{domain_key}{TARGET_SUFFIX}')
+            else:
+                deleted_subdomains_blocklist += 1
         else:
-            domain_key = domain
-        if domain_key not in seen_domains_blocklist:
-            seen_domains_blocklist[domain_key] = domain
-            result_blocklist.add(f'||{domain_key}')
-        else:
-            deleted_subdomains_blocklist += 1
+            if len(parts) >= 2:
+                domain_key = '.'.join(parts[-2:])
+            else:
+                domain_key = domain
+            if domain_key not in seen_domains_blocklist:
+                seen_domains_blocklist[domain_key] = domain
+                result_blocklist.add(f'||{domain_key}')
+            else:
+                deleted_subdomains_blocklist += 1
     else:
         result_blocklist.add(line)
 
