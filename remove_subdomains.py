@@ -2,10 +2,16 @@ import re
 import requests
 from datetime import datetime
 
-# 从 GitHub 获取白名单文件
+# 获取 GitHub 上的白名单文件 URL
 url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
-response = requests.get(url)
-whitelist = response.text.splitlines()
+
+try:
+    response = requests.get(url)
+    response.raise_for_status()  # 如果请求失败，会抛出异常
+    whitelist = response.text.splitlines()
+except requests.RequestException as e:
+    print(f"Error fetching whitelist: {e}")
+    exit(1)
 
 # 用于存储结果
 result = set()
@@ -47,9 +53,13 @@ header = [
 ]
 
 # 输出新的白名单规则，带上头部信息
-with open('cleaned_whitelist.txt', 'w') as f:
-    f.write('\n'.join(header) + '\n\n')
-    f.write('\n'.join(sorted(result)) + '\n')
+try:
+    with open('cleaned_whitelist.txt', 'w') as f:
+        f.write('\n'.join(header) + '\n\n')
+        f.write('\n'.join(sorted(result)) + '\n')
+except Exception as e:
+    print(f"Error writing the file: {e}")
+    exit(1)
 
 # 输出删除的子域数量到控制台（可选）
 print(f"Deleted subdomains: {deleted_subdomains}")
