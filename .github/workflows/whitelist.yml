@@ -2,7 +2,14 @@ name: Clean AdGuardHome Rules
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 每天午夜运行
+    # 每天 0 点、15 分、30 分、45 分执行（UTC 时区）
+    - cron: "0 0,15,30,45 0 * * *"   # 每天午夜运行
+    # 每天 6 点、15 分、30 分、45 分执行（UTC 时区）
+    - cron: "0 0,15,30,45 6 * * *"   # 每天 6 点、15 分、30 分、45 分执行
+    # 每天 12 点、15 分、30 分、45 分执行（UTC 时区）
+    - cron: "0 0,15,30,45 12 * * *"  # 每天 12 点、15 分、30 分、45 分执行
+    # 每天 18 点、15 分、30 分、45 分执行（UTC 时区）
+    - cron: "0 0,15,30,45 18 * * *"  # 每天 18 点、15 分、30 分、45 分执行
   workflow_dispatch:         # 支持手动触发
 
 permissions:
@@ -38,8 +45,10 @@ jobs:
 
           # 处理每一条域名，去重并删除子域
           while IFS= read -r line; do
-            split_line=($(echo $line | tr '.' ' '))
-            domain="${split_line[-2]}.${split_line[-1]}"
+            # 用 . 分割域名，提取父域
+            domain_parts=($(echo $line | tr '.' '\n'))
+            # 获取倒数第二和倒数第一部分，组合成父域
+            domain="${domain_parts[-2]}.${domain_parts[-1]}"
             
             # 检查父域是否已经记录
             if ! grep -q "$domain" $temp_file; then
