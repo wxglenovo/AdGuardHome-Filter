@@ -8,7 +8,7 @@ on:
     paths:
       - 'dist/whitelist.txt'   # 监控PR中whitelist.txt文件的变动
   schedule:
-    - cron: "0 0 * * *"  # 定时触发，每天0点更新（可以根据需要调整）
+    - cron: "0 0 * * *"  # 每天0点执行（可以根据需要调整）
 
 jobs:
   process:
