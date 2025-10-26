@@ -23,7 +23,7 @@ def fetch_file(url):
 whitelist = fetch_file(whitelist_url)
 blocklist = fetch_file(blocklist_url)
 
-# 用于存储结果
+# 用于存储去重后的结果
 result_whitelist = set()
 result_blocklist = set()
 
@@ -83,9 +83,9 @@ def write_current_count(whitelist_count, blocklist_count):
     with open(last_count_file, 'w') as f:
         f.write(f"{whitelist_count}\n{blocklist_count}\n")
 
-# 获取当前规则数量
-current_whitelist_count = len(whitelist)
-current_blocklist_count = len(blocklist)
+# 获取当前规则数量（去重后的数量）
+current_whitelist_count = len(result_whitelist)
+current_blocklist_count = len(result_blocklist)
 
 # 获取上次的规则数量
 last_whitelist_count, last_blocklist_count = read_last_count()
@@ -95,11 +95,12 @@ whitelist_diff = current_whitelist_count - last_whitelist_count
 blocklist_diff = current_blocklist_count - last_blocklist_count
 
 # 生成文件头部信息（中文）
-def generate_header(file_type, original_count, deleted_count, diff_count):
+def generate_header(file_type, original_count, deleted_count, current_count, diff_count):
     return [
         f"# {file_type} 文件生成时间: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        f"# 现有规则数量: {original_count}",
+        f"# 原始规则数量: {original_count}",
         f"# 删除的子域名数量: {deleted_count}",
+        f"# 清除子域后的规则数量: {current_count}",
         f"# 与上次对比，{('增加' if diff_count > 0 else '减少') if diff_count != 0 else '无变化'} {abs(diff_count)} 条规则",
         f"# 由 GitHub Actions 处理生成"
     ]
@@ -107,12 +108,12 @@ def generate_header(file_type, original_count, deleted_count, diff_count):
 # 输出新的白名单规则，带上中文头部信息
 try:
     with open('cleaned_whitelist.txt', 'w') as f:
-        header = generate_header("白名单", current_whitelist_count, deleted_subdomains_whitelist, whitelist_diff)
+        header = generate_header("白名单", len(whitelist), deleted_subdomains_whitelist, current_whitelist_count, whitelist_diff)
         f.write('\n'.join(header) + '\n\n')
         f.write('\n'.join(sorted(result_whitelist)) + '\n')
 
     with open('cleaned_blocklist.txt', 'w') as f:
-        header = generate_header("黑名单", current_blocklist_count, deleted_subdomains_blocklist, blocklist_diff)
+        header = generate_header("黑名单", len(blocklist), deleted_subdomains_blocklist, current_blocklist_count, blocklist_diff)
         f.write('\n'.join(header) + '\n\n')
         f.write('\n'.join(sorted(result_blocklist)) + '\n')
 
