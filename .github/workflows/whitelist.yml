@@ -1,4 +1,4 @@
-name: Clean AdGuardHome Rules
+name: Clean AdGuardHome whitelist
 
 on:
   schedule:
@@ -25,53 +25,22 @@ jobs:
 
       - name: Download whitelist.txt
         run: |
-          echo "开始下载 whitelist.txt 文件..."
           curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
-          echo "下载完成！"
-
       - name: Process rules to remove redundant subdomains
         run: |
-          echo "开始处理 whitelist.txt 文件..."
+          # 读取原始 whitelist.txt
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
           
           # 处理规则，保留父域（例如www.example.com -> example.com）
-          deleted_count=0
-          temp_file=$(mktemp)
-
-          # 输出文件头部信息
-          echo -e "# 处理日期: $(date)" > $temp_file
-          echo -e "# 说明: 删除了冗余的子域，只保留父域" >> $temp_file
-          echo -e "# 删除的子域数量: 0" >> $temp_file
-
-          # 处理每一条域名，去重并删除子域
-          while IFS= read -r line; do
-            # 用 . 分割域名，提取父域
-            domain_parts=($(echo $line | tr '.' '\n'))
-            # 获取倒数第二和倒数第一部分，组合成父域
-            domain="${domain_parts[-2]}.${domain_parts[-1]}"
-            
-            # 检查父域是否已经记录
-            if ! grep -q "$domain" $temp_file; then
-              echo $domain >> $temp_file
-            else
-              # 如果是子域，增加删除计数
-              deleted_count=$((deleted_count+1))
-            fi
-          done < sorted_whitelist.txt
-
-          # 更新文件头部中的删除子域数量
-          sed -i "3s/.*/# 删除的子域数量: $deleted_count/" $temp_file
-          
-          # 将处理后的规则写入 final_whitelist.txt
-          mv $temp_file final_whitelist.txt
-          echo "处理完成，删除了 $deleted_count 个子域"
-
+          awk '{
+            split($1, parts, ".")
+            domain = parts[length(parts)-1] "." parts[length(parts)]
+            print domain
+          }' sorted_whitelist.txt | sort | uniq > final_whitelist.txt
       - name: Commit the cleaned whitelist
         run: |
-          echo "准备提交更新..."
           git config --global user.email "youremail@example.com"
           git config --global user.name "YourName"
           git add final_whitelist.txt
           git commit -m "Cleaned whitelist by removing redundant subdomains"
           git push
-          echo "提交成功！"
