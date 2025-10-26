@@ -42,49 +42,36 @@ def get_base_domain(domain):
         return '.'.join(parts[-2:])
     return domain
 
-# 处理白名单
-for line in whitelist:
-    if line.startswith("@@||"):
-        domain = line[4:]
-        # 如果有规则后缀（例如 ^$generichide），提取出来
-        rule_suffix = ""
-        if "^" in domain:
-            domain, rule_suffix = domain.split("^", 1)
-            rule_suffix = "^" + rule_suffix  # 保留规则后缀
+# 处理规则去重
+def process_rules(rules, result_set, seen_domains, deleted_count):
+    for line in rules:
+        if line.startswith("@@||") or line.startswith("||"):
+            domain = line[4:] if line.startswith("@@||") else line[2:]
+            rule_suffix = ""
+            
+            # 如果有规则后缀（例如 ^$generichide），提取出来
+            if "^" in domain:
+                domain, rule_suffix = domain.split("^", 1)
+                rule_suffix = "^" + rule_suffix  # 保留规则后缀
 
-        base_domain = get_base_domain(domain)
-        
-        # 检查父域 + 子域是否同时出现，且规则后缀相同
-        if (base_domain, rule_suffix) not in seen_domains_whitelist:
-            seen_domains_whitelist[(base_domain, rule_suffix)] = domain + rule_suffix
-            result_whitelist.add(f'@@||{base_domain}{rule_suffix}')
+            base_domain = get_base_domain(domain)
+            
+            # 检查父域 + 子域是否同时出现，且规则后缀相同
+            if (base_domain, rule_suffix) not in seen_domains:
+                seen_domains[(base_domain, rule_suffix)] = domain + rule_suffix
+                result_set.add(f'{line}')
+            else:
+                # 已存在父域且规则后缀一致，删除子域规则
+                deleted_count += 1
         else:
-            # 已存在父域且规则后缀一致，删除子域规则
-            deleted_subdomains_whitelist += 1
-    else:
-        result_whitelist.add(line)
+            result_set.add(line)
+    return deleted_count
+
+# 处理白名单
+deleted_subdomains_whitelist = process_rules(whitelist, result_whitelist, seen_domains_whitelist, deleted_subdomains_whitelist)
 
 # 处理黑名单
-for line in blocklist:
-    if line.startswith("||"):
-        domain = line[2:]
-        # 如果有规则后缀（例如 ^$generichide），提取出来
-        rule_suffix = ""
-        if "^" in domain:
-            domain, rule_suffix = domain.split("^", 1)
-            rule_suffix = "^" + rule_suffix  # 保留规则后缀
-
-        base_domain = get_base_domain(domain)
-
-        # 检查父域 + 子域是否同时出现，且规则后缀相同
-        if (base_domain, rule_suffix) not in seen_domains_blocklist:
-            seen_domains_blocklist[(base_domain, rule_suffix)] = domain + rule_suffix
-            result_blocklist.add(f'||{base_domain}{rule_suffix}')
-        else:
-            # 已存在父域且规则后缀一致，删除子域规则
-            deleted_subdomains_blocklist += 1
-    else:
-        result_blocklist.add(line)
+deleted_subdomains_blocklist = process_rules(blocklist, result_blocklist, seen_domains_blocklist, deleted_subdomains_blocklist)
 
 # 读取上次的规则数量
 def read_last_count():
