@@ -1,14 +1,3 @@
-name: Clean AdGuardHome Rules
-
-on:
-  schedule:
-    # 每天 0 点、15 分、30 分、45 分执行（UTC 时区）
-    - cron: "0 0,15,30,45 0 * * *"   # 每天午夜运行
-    - cron: "0 0,15,30,45 6 * * *"   # 每天 6 点、15 分、30 分、45 分执行
-    - cron: "0 0,15,30,45 12 * * *"  # 每天 12 点、15 分、30 分、45 分执行
-    - cron: "0 0,15,30,45 18 * * *"  # 每天 18 点、15 分、30 分、45 分执行
-  workflow_dispatch:         # 支持手动触发
-
 permissions:
   contents: write
 
@@ -22,59 +11,31 @@ jobs:
 
       - name: Download whitelist.txt
         run: |
-          echo "开始下载 whitelist.txt 文件..."
           curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
-          echo "下载完成！"
 
       - name: Process rules to remove redundant subdomains
         run: |
-          echo "开始处理 whitelist.txt 文件..."
+          # 读取原始 whitelist.txt
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
           
           # 处理规则，保留父域（例如www.example.com -> example.com）
-          deleted_count=0
-          temp_file=$(mktemp)
-
-          # 输出文件头部信息
-          echo -e "# 处理日期: $(date)" > $temp_file
-          echo -e "# 说明: 删除了冗余的子域，只保留父域" >> $temp_file
-          echo -e "# 删除的子域数量: 0" >> $temp_file
-
-          # 处理每一条域名，去重并删除子域
-          while IFS= read -r line; do
-            # 用 . 分割域名，提取父域
-            domain_parts=($(echo $line | tr '.' '\n'))
-            # 获取倒数第二和倒数第一部分，组合成父域
-            domain="${domain_parts[-2]}.${domain_parts[-1]}"
-            
-            # 检查父域是否已经记录
-            if ! grep -q "$domain" $temp_file; then
-              echo $domain >> $temp_file
-            else
-              # 如果是子域，增加删除计数
-              deleted_count=$((deleted_count+1))
-            fi
-          done < sorted_whitelist.txt
-
-          # 更新文件头部中的删除子域数量
-          sed -i "3s/.*/# 删除的子域数量: $deleted_count/" $temp_file
-          
-          # 将处理后的规则写入 final_whitelist.txt
-          mv $temp_file final_whitelist.txt
-          echo "处理完成，删除了 $deleted_count 个子域"
+          awk '{
+            split($1, parts, ".")
+            domain = parts[length(parts)-1] "." parts[length(parts)]
+            print domain
+          }' sorted_whitelist.txt | sort | uniq > final_whitelist.txt
 
       - name: Commit the cleaned whitelist
         run: |
-          echo "准备提交更新..."
+          # 配置 git 用户信息
           git config --global user.email "youremail@example.com"
           git config --global user.name "YourName"
-          
-          # 添加所有修改的文件到 git
-          git add final_whitelist.txt whitelist.txt sorted_whitelist.txt
 
-          # 检查是否有文件更改
+          # 添加生成的 final_whitelist.txt 文件到 Git
+          git add final_whitelist.txt
+
+          # 检查是否有修改的内容，如果有就提交
           git diff --cached --exit-code || git commit -m "Cleaned whitelist by removing redundant subdomains"
 
-          # 推送提交
+          # 推送更改到远程仓库
           git push
-          echo "提交成功！"
