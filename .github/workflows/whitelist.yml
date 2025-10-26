@@ -1,8 +1,11 @@
-name: Clean AdGuardHome Rules
+name:  AdGuardHome whitelist
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 每天午夜运行
+    - cron: "0 0,15,30,45 0 * * *"   # 每天 0 点、15 分、30 分、45 分执行
+    - cron: "0 0,15,30,45 6 * * *"   # 每天 6 点、15 分、30 分、45 分执行
+    - cron: "0 0,15,30,45 12 * * *"  # 每天 12 点、15 分、30 分、45 分执行
+    - cron: "0 0,15,30,45 18 * * *"  # 每天 18 点、15 分、30 分、45 分执行
   workflow_dispatch:         # 支持手动触发
 
 permissions:
@@ -25,12 +28,33 @@ jobs:
           # 读取原始 whitelist.txt
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
           
-          # 处理规则，保留父域（例如www.example.com -> example.com）
-          awk '{
-            split($1, parts, ".")
-            domain = parts[length(parts)-1] "." parts[length(parts)]
-            print domain
-          }' sorted_whitelist.txt | sort | uniq > final_whitelist.txt
+          # 处理规则，保留父域并记录删除的子域
+          deleted_count=0
+          temp_file=$(mktemp)
+
+          # 输出文件头部信息
+          echo -e "# 处理日期: $(date)" > $temp_file
+          echo -e "# 说明: 删除了冗余的子域，只保留父域" >> $temp_file
+          echo -e "# 删除的子域数量: 0" >> $temp_file
+
+          while IFS= read -r line; do
+            split_line=($(echo $line | tr '.' ' '))
+            domain="${split_line[-2]}.${split_line[-1]}"
+            
+            # 检查父域是否已经记录
+            if ! grep -q "$domain" $temp_file; then
+              echo $domain >> $temp_file
+            else
+              # 如果是子域，增加删除计数
+              deleted_count=$((deleted_count+1))
+            fi
+          done < sorted_whitelist.txt
+
+          # 更新文件头部中的删除子域数量
+          sed -i "3s/.*/# 删除的子域数量: $deleted_count/" $temp_file
+          
+          # 将处理后的规则写入 final_whitelist.txt
+          mv $temp_file final_whitelist.txt
 
       - name: Commit the cleaned whitelist
         run: |
