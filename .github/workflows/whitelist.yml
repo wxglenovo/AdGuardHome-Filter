@@ -8,7 +8,7 @@ on:
     paths:
       - 'dist/whitelist.txt'   # 监控PR中whitelist.txt文件的变动
   schedule:
-    - cron: "0 8,14,20,2 * * *"  # 每天的 08:00、14:00、20:00 和次日 02:00 (UTC+8时间)
+    - cron: "0 0,6,12,18 * * *"  # 每天的 00:00、06:00、12:00 和 18:00 (UTC+8时间)
 
 jobs:
   process:
@@ -23,13 +23,15 @@ jobs:
       - name: Download whitelist.txt
         run: |
           echo "Downloading whitelist.txt from GitHub"
-          curl -o dist/whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
+          curl -o dist/whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/dist/whitelist.txt
 
       # 3. 使用 Shell 脚本处理 whitelist.txt 文件
       - name: Process whitelist.txt using shell script
         run: |
           echo "Processing whitelist.txt"
-          
+          echo "Reading whitelist.txt contents:"
+          cat dist/whitelist.txt  # 输出文件内容以进行调试
+
           # 创建一个临时文件存储最终结果
           TEMP_FILE="dist/processed_whitelist.txt"
           touch $TEMP_FILE
@@ -37,9 +39,11 @@ jobs:
           # 遍历 whitelist.txt 中的域名
           while IFS= read -r line; do
             domain=$(echo $line | tr -d '[:space:]')  # 去除空格
+            echo "Processing domain: $domain"  # 输出正在处理的域名
 
             # 如果该域名已经存在于处理结果中，则跳过
             if grep -qx "$domain" $TEMP_FILE; then
+              echo "Domain $domain already exists, skipping."
               continue
             fi
 
@@ -50,6 +54,7 @@ jobs:
             for ((i=1; i<$domain_level; i++)); do
               parent_domain=$(echo "${parts[@]:$i}" | tr ' ' '.')
               if grep -qx "$parent_domain" $TEMP_FILE; then
+                echo "Skipping child domain $domain, parent domain $parent_domain already exists."
                 continue 2  # 如果父域已在文件中，跳过该子域
               fi
             done
@@ -58,6 +63,8 @@ jobs:
             echo $domain >> $TEMP_FILE
 
           done < dist/whitelist.txt
+
+          echo "Processing complete."
 
       # 4. 提交处理后的 whitelist 文件
       - name: Commit processed whitelist.txt
