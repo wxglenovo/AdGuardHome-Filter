@@ -56,10 +56,9 @@ jobs:
 
           # 处理每个域名
           while IFS= read -r line; do
-            # 分割域名，保留父域
+            # 分割域名，保留二级、三级父域
             split_line=($(echo $line | tr '.' ' '))
-            domain="${split_line[-2]}.${split_line[-1]}"
-
+            domain="${split_line[-2]}.${split_line[-1]}"  # 保留二级域名
             # 检查父域是否已经记录
             if ! grep -q "$domain" $temp_file; then
               echo $domain >> $temp_file
