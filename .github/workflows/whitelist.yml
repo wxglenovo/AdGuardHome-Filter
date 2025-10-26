@@ -1,4 +1,4 @@
-name:  AdGuardHome whitelist
+  name: Clean AdGuardHome whitelist
 
 on:
   schedule:
@@ -28,7 +28,7 @@ jobs:
           # 读取原始 whitelist.txt
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
           
-          # 处理规则，保留父域并记录删除的子域
+          # 处理规则，保留父域（例如www.example.com -> example.com）
           deleted_count=0
           temp_file=$(mktemp)
 
