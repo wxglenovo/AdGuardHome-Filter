@@ -1,84 +1,51 @@
-name: Process Whitelist
+#!/bin/bash
 
-on:
-  push:
-    paths:
-      - 'dist/whitelist.txt'   # 监控whitelist.txt文件的变动
-  pull_request:
-    paths:
-      - 'dist/whitelist.txt'   # 监控PR中whitelist.txt文件的变动
-  schedule:
-    - cron: "0 0,6,12,18 * * *"  # 每天的 00:00、06:00、12:00 和 18:00 (UTC)
+# 下载 whitelist.txt 文件
+curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 
-jobs:
-  process:
-    runs-on: ubuntu-latest
+# 创建一个临时文件存储处理结果
+TEMP_FILE="processed_whitelist.txt"
+> $TEMP_FILE  # 清空文件
 
-    steps:
-      # 1. Checkout 仓库代码
-      - name: Checkout repository
-        uses: actions/checkout@v3
+# 处理 whitelist.txt 文件
+while IFS= read -r line; do
+    domain=$(echo $line | tr -d '[:space:]')  # 去除空格
 
-      # 2. 下载 whitelist.txt 文件
-      - name: Download whitelist.txt
-        run: |
-          echo "Downloading whitelist.txt from GitHub"
-          curl -o dist/whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/main/dist/whitelist.txt
-          echo "Downloaded whitelist.txt:"
-          cat dist/whitelist.txt  # 输出文件内容查看是否正确下载
+    # 跳过空行
+    if [ -z "$domain" ]; then
+        continue
+    fi
 
-      # 3. 使用 Shell 脚本处理 whitelist.txt 文件
-      - name: Process whitelist.txt using shell script
-        run: |
-          echo "Processing whitelist.txt"
-          
-          # 显示当前文件的内容以确保读取正确
-          echo "Reading contents of whitelist.txt:"
-          cat dist/whitelist.txt
+    # 分割域名为数组，按 '.' 分隔
+    parts=($(echo "$domain" | tr '.' ' '))
 
-          # 创建一个临时文件存储最终结果
-          TEMP_FILE="dist/processed_whitelist.txt"
-          touch $TEMP_FILE
+    # 获取域名的层级数
+    domain_level=${#parts[@]}
 
-          # 遍历 whitelist.txt 中的域名
-          while IFS= read -r line; do
-            domain=$(echo $line | tr -d '[:space:]')  # 去除空格
-            echo "Processing domain: $domain"  # 输出正在处理的域名
+    # 遍历处理已经出现过的父域
+    skip=false
+    for ((i=1; i<$domain_level; i++)); do
+        parent_domain=$(echo "${parts[@]:$i}" | tr ' ' '.')
+        
+        # 如果父域已经存在于临时文件中，跳过该子域
+        if grep -qx "$parent_domain" $TEMP_FILE; then
+            skip=true
+            break
+        fi
+    done
 
-            # 如果该域名已经存在于处理结果中，则跳过
-            if grep -qx "$domain" $TEMP_FILE; then
-              echo "Domain $domain already exists, skipping."
-              continue
-            fi
+    # 如果没有跳过，加入临时文件
+    if [ "$skip" = false ]; then
+        echo $domain >> $TEMP_FILE
+    fi
 
-            # 逐层检查是否有父域已在文件中，如果有，跳过当前子域
-            parts=($(echo "$domain" | tr '.' ' '))  # 分割域名为数组
-            domain_level=${#parts[@]}
+done < whitelist.txt
 
-            for ((i=1; i<$domain_level; i++)); do
-              parent_domain=$(echo "${parts[@]:$i}" | tr ' ' '.')
-              if grep -qx "$parent_domain" $TEMP_FILE; then
-                echo "Skipping child domain $domain, parent domain $parent_domain already exists."
-                continue 2  # 如果父域已在文件中，跳过该子域
-              fi
-            done
+# 输出处理完成的文件
+echo "Processed whitelist.txt saved to $TEMP_FILE"
+cat $TEMP_FILE  # 查看最终结果
 
-            # 将域名写入处理结果文件
-            echo $domain >> $TEMP_FILE
-
-          done < dist/whitelist.txt
-
-          echo "Processing complete."
-
-      # 4. 提交处理后的 whitelist 文件
-      - name: Commit processed whitelist.txt
-        uses: EndBug/add-and-commit@v9
-        with:
-          author_name: 'github-actions[bot]'
-          author_email: 'github-actions[bot]@users.noreply.github.com'
-          message: 'Update processed whitelist.txt'
-          add: 'dist/processed_whitelist.txt'
-
-      # 5. 输出工作流运行的日志
-      - name: Show completed processing message
-        run: echo "Processing complete. The processed whitelist.txt has been updated."
+# 提交处理后的文件
+git add $TEMP_FILE
+git commit -m "Processed whitelist to remove redundant subdomains"
+git push origin main
