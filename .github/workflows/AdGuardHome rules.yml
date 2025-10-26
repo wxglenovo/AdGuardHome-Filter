@@ -70,14 +70,14 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
           
-          # 创建单独的白名单和黑名单文件
-          echo "📜 白名单规则:" > dist/whitelist.txt
-          cat tmp/whitelist.txt >> dist/whitelist.txt
-          echo "------------------------------------------------------------" >> dist/whitelist.txt
-
-          echo "📜 黑名单规则:" > dist/blocklist.txt
-          cat tmp/blocklist.txt >> dist/blocklist.txt
-          echo "------------------------------------------------------------" >> dist/blocklist.txt
+          # 排序并按父域排序（保留符号）
+          echo "📜 排序白名单规则..." 
+          # 白名单按父域排序，保留原有符号 @@||
+          sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt > dist/whitelist.txt
+          
+          echo "📜 排序黑名单规则..." 
+          # 黑名单按父域排序，保留原有符号 ||
+          sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt > dist/blocklist.txt
 
       - name: Commit Changes
         id: commit
