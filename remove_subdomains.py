@@ -35,7 +35,7 @@ seen_domains_blocklist = {}
 deleted_subdomains_whitelist = 0
 deleted_subdomains_blocklist = 0
 
-# 获取二级域名（父域）
+# 获取父域（即二级域名及以上）
 def get_base_domain(domain):
     parts = domain.split('.')
     if len(parts) >= 2:
