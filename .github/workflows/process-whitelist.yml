@@ -8,7 +8,7 @@ on:
     paths:
       - 'dist/whitelist.txt'   # 监控PR中whitelist.txt文件的变动
   schedule:
-    - cron: "0 0 * * *"  # 每天0点执行（可以根据需要调整）
+    - cron: "0 0,6,12,18 * * *"  # 每天的 00:00、06:00、12:00 和 18:00 执行
 
 jobs:
   process:
@@ -22,9 +22,10 @@ jobs:
       # 2. 下载 whitelist.txt 文件
       - name: Download whitelist.txt
         run: |
+          echo "Downloading whitelist.txt from GitHub"
           curl -o dist/whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 
-      # 3. 安装 Python
+      # 3. 安装 Python 环境
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -33,6 +34,7 @@ jobs:
       # 4. 处理 whitelist.txt 文件
       - name: Process whitelist.txt
         run: |
+          echo "Processing whitelist.txt"
           python3 -m pip install --upgrade pip
           pip install requests
 
@@ -99,3 +101,7 @@ if __name__ == "__main__":
           author_email: 'github-actions[bot]@users.noreply.github.com'
           message: 'Update processed whitelist.txt'
           add: 'dist/processed_whitelist.txt'
+
+      # 6. 输出工作流运行的日志
+      - name: Show completed processing message
+        run: echo "Processing complete. The processed whitelist.txt has been updated."
