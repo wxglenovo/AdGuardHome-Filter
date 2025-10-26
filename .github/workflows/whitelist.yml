@@ -25,77 +25,41 @@ jobs:
           echo "Downloading whitelist.txt from GitHub"
           curl -o dist/whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 
-      # 3. 安装 Python 环境
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      # 4. 安装依赖
-      - name: Install dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install requests
-
-      # 5. 处理 whitelist.txt 文件
-      - name: Process whitelist.txt
+      # 3. 使用 Shell 脚本处理 whitelist.txt 文件
+      - name: Process whitelist.txt using shell script
         run: |
           echo "Processing whitelist.txt"
-          echo '
-import re
+          
+          # 创建一个临时文件存储最终结果
+          TEMP_FILE="dist/processed_whitelist.txt"
+          touch $TEMP_FILE
 
-def get_domain_level(domain):
-    """ 获取域名的层级 """
-    return len(domain.split("."))
+          # 遍历 whitelist.txt 中的域名
+          while IFS= read -r line; do
+            domain=$(echo $line | tr -d '[:space:]')  # 去除空格
 
-def process_domains(file_path):
-    with open(file_path, "r") as f:
-        domains = f.readlines()
+            # 如果该域名已经存在于处理结果中，则跳过
+            if grep -qx "$domain" $TEMP_FILE; then
+              continue
+            fi
 
-    final_domains = []
-    seen_domains = set()
+            # 逐层检查是否有父域已在文件中，如果有，跳过当前子域
+            parts=($(echo "$domain" | tr '.' ' '))  # 分割域名为数组
+            domain_level=${#parts[@]}
 
-    for domain in domains:
-        domain = domain.strip()
+            for ((i=1; i<$domain_level; i++)); do
+              parent_domain=$(echo "${parts[@]:$i}" | tr ' ' '.')
+              if grep -qx "$parent_domain" $TEMP_FILE; then
+                continue 2  # 如果父域已在文件中，跳过该子域
+              fi
+            done
 
-        if domain in seen_domains:
-            continue
+            # 将域名写入处理结果文件
+            echo $domain >> $TEMP_FILE
 
-        parts = domain.split(".")
-        domain_level = get_domain_level(domain)
+          done < dist/whitelist.txt
 
-        # 查找是否有较高层级的同名父域
-        is_duplicate = False
-        for i in range(1, domain_level):
-            parent_domain = ".".join(parts[i:])
-            if parent_domain in seen_domains:
-                is_duplicate = True
-                break
-
-        if not is_duplicate:
-            seen_domains.add(domain)
-            final_domains.append(domain)
-
-    return final_domains
-
-def save_to_file(domains, output_path):
-    with open(output_path, "w") as f:
-        for domain in domains:
-            f.write(domain + "\n")
-
-if __name__ == "__main__":
-    input_file = "dist/whitelist.txt"
-    output_file = "dist/processed_whitelist.txt"
-    final_domains = process_domains(input_file)
-    save_to_file(final_domains, output_file)
-
-    print(f"处理完成，结果已保存至 {output_file}")
-          ' > process_whitelist.py
-
-          # 运行处理脚本
-          python3 process_whitelist.py
-
-      # 6. 提交处理后的 whitelist 文件
+      # 4. 提交处理后的 whitelist 文件
       - name: Commit processed whitelist.txt
         uses: EndBug/add-and-commit@v9
         with:
@@ -104,6 +68,6 @@ if __name__ == "__main__":
           message: 'Update processed whitelist.txt'
           add: 'dist/processed_whitelist.txt'
 
-      # 7. 输出工作流运行的日志
+      # 5. 输出工作流运行的日志
       - name: Show completed processing message
         run: echo "Processing complete. The processed whitelist.txt has been updated."
