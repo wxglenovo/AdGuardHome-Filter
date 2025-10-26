@@ -22,21 +22,79 @@ jobs:
 
       - name: Download whitelist.txt
         run: |
+          echo "下载 whitelist.txt 文件..."
           curl -o whitelist.txt https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
+          echo "下载完成！"
 
       - name: Process rules to remove redundant subdomains
         run: |
+          echo "开始处理 whitelist.txt 文件..."
+          
+          # 检查文件是否成功下载
+          if [[ ! -f whitelist.txt ]]; then
+            echo "whitelist.txt 文件下载失败"
+            exit 1
+          fi
+
+          # 提取域名并去重
           cat whitelist.txt | awk '{print $1}' | sort | uniq > sorted_whitelist.txt
-          awk '{
-            split($1, parts, ".")
-            domain = parts[length(parts)-1] "." parts[length(parts)]
-            print domain
-          }' sorted_whitelist.txt | sort | uniq > final_whitelist.txt
+          
+          # 检查是否生成了 sorted_whitelist.txt
+          if [[ ! -f sorted_whitelist.txt ]]; then
+            echo "sorted_whitelist.txt 文件未生成"
+            exit 1
+          fi
+
+          # 处理规则，保留父域（例如www.example.com -> example.com）
+          deleted_count=0
+          temp_file=$(mktemp)
+
+          # 输出文件头部信息
+          echo -e "# 处理日期: $(date)" > $temp_file
+          echo -e "# 说明: 删除了冗余的子域，只保留父域" >> $temp_file
+          echo -e "# 删除的子域数量: 0" >> $temp_file
+
+          # 处理每个域名
+          while IFS= read -r line; do
+            # 分割域名，保留父域
+            split_line=($(echo $line | tr '.' ' '))
+            domain="${split_line[-2]}.${split_line[-1]}"
+
+            # 检查父域是否已经记录
+            if ! grep -q "$domain" $temp_file; then
+              echo $domain >> $temp_file
+            else
+              # 如果是子域，增加删除计数
+              deleted_count=$((deleted_count+1))
+            fi
+          done < sorted_whitelist.txt
+
+          # 更新文件头部中的删除子域数量
+          sed -i "3s/.*/# 删除的子域数量: $deleted_count/" $temp_file
+          
+          # 将处理后的规则写入 final_whitelist.txt
+          mv $temp_file final_whitelist.txt
+          echo "处理完成，生成了 final_whitelist.txt"
 
       - name: Commit the cleaned whitelist
         run: |
+          echo "准备提交更新..."
           git config --global user.email "youremail@example.com"
           git config --global user.name "YourName"
+          
+          # 添加生成的 final_whitelist.txt 文件到 Git
           git add final_whitelist.txt
+          
+          # 检查是否有修改
+          git diff --cached --exit-code
+          if [ $? -eq 0 ]; then
+            echo "没有文件更改，不需要提交"
+            exit 0
+          fi
+
+          # 提交更改
           git commit -m "Cleaned whitelist by removing redundant subdomains"
+
+          # 推送更改到远程仓库
           git push
+          echo "提交成功！"
