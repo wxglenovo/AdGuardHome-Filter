@@ -21,9 +21,7 @@ jobs:
 
       - name: Download & Merge Rules (Clean + Deduplicate)
         run: |
-          set -e
           mkdir -p dist tmp
-
           urls=(
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
@@ -43,38 +41,36 @@ jobs:
           )
 
           echo "📥 开始下载并合并所有规则..."
-          rm -f tmp/all_raw.txt tmp/all_cleaned.txt tmp/all_deduped.txt
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
 
-          echo "✅ 下载完成，原始规则行数: $(wc -l < tmp/all_raw.txt)"
-
-          echo "🧹 清理注释和空行..."
+          echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
-          echo "✅ 清理完成，行数: $(wc -l < tmp/all_cleaned.txt)"
 
-          echo "📊 去重并排序 (LC_ALL=C sort -u)..."
-          LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
-          echo "✅ 去重完成，行数: $(wc -l < tmp/all_deduped.txt)"
+          echo "📊 去重并排序白名单（LC_ALL=C sort -u）..."
+          LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped_tmp.txt
 
-          # 分离白名单和黑名单
-          echo "📂 分离白名单和黑名单..."
-          grep '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/whitelist.txt || true
-          grep -v '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/blocklist.txt || true
+          # ✅ 将白名单和黑名单分开
+          grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
+          grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          echo "✅ 白名单行数: $(wc -l < dist/whitelist.txt)"
-          echo "✅ 黑名单行数: $(wc -l < dist/blocklist.txt)"
+          # ✅ wxglenovo 源内白名单优先置顶
+          curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
+            | grep '^@@||' > tmp/source_whitelist.txt
 
-          # 输出统计信息
+          # 合并 wxglenovo 白名单 + 其他白名单 + 黑名单，保持去重
+          cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | LC_ALL=C sort -u > tmp/all_deduped.txt
+
+          # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-          WHITELIST_COUNT=$(wc -l < dist/whitelist.txt)
-          BLACKLIST_COUNT=$(wc -l < dist/blocklist.txt)
+          WHITELIST_COUNT=$(grep -c '^@@||' tmp/all_deduped.txt)
+          BLACKLIST_COUNT=$(grep -c -v '^@@||' tmp/all_deduped.txt)
           WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
@@ -85,9 +81,53 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          echo "📁 dist目录文件列表:"
-          ls -l dist/
-          echo "前 10 行 whitelist:"
-          head -n 10 dist/whitelist.txt
-          echo "前 10 行 blocklist:"
-          head -n 10 dist/blocklist.txt
+          # ✅ 排序并按父域排序（保留符号）
+          echo "📜 排序白名单规则..."
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt > dist/whitelist.txt
+
+          echo "📜 排序黑名单规则..."
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt > dist/blocklist.txt
+
+      - name: Commit Changes
+        id: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          NEW_COUNT=$(wc -l < dist/whitelist.txt)
+          git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
+          if git diff --cached --quiet; then
+            echo "no_change=true" >> $GITHUB_OUTPUT
+            echo "No new rules to commit"
+          else
+            echo "no_change=false" >> $GITHUB_OUTPUT
+            git commit -m "🧩 更新 AdGuardHome 规则"
+            git pull --rebase origin main || true
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          fi
+
+      - name: Create or Update Release
+        if: steps.commit.outputs.no_change == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "🧩 AdGuardHome Rules"
+          body: |
+            更新 AdGuardHome 白名单和黑名单
+          files: |
+            dist/whitelist.txt
+            dist/blocklist.txt
+
+      - name: Show Result
+        run: |
+          echo "================= ✅ 合并完成 ================="
+          cat dist/old_rules.txt
+          echo "------------------------------------------------------------"
+          echo "📁 白名单文件路径：dist/whitelist.txt"
+          echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
+          echo "📁 黑名单文件路径：dist/blocklist.txt"
+          echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
+          echo "前 20 行白名单示例："
+          head -n 20 dist/whitelist.txt
+          echo "前 20 行黑名单示例："
+          head -n 20 dist/blocklist.txt
+          echo "============================================================"
