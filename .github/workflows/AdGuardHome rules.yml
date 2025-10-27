@@ -19,27 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
+      - name: Download & Merge Rules
         run: |
           mkdir -p tmp dist
 
-          urls=(
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"
-            "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
-            "https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads"
-            "https://www.i-dont-care-about-cookies.eu/abp/"
-            "https://anti-ad.net/easylist.txt"
-            "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
-            "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
-            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
-            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
-            "https://easylist-downloads.adblockplus.org/easylist.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
-            "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
-            "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
-            "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
-          )
+          # 从仓库根目录读取 URL 列表
+          mapfile -t urls < ./urls.txt
 
           echo "📥 开始下载并合并规则..."
           for url in "${urls[@]}"; do
@@ -51,27 +36,46 @@ jobs:
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重（LC_ALL=C sort -u）..."
+          echo "📊 去重..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
 
-          echo "⚔️ 黑白名单冲突抵消..."
-          grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
-          grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
+          # 分离白名单和黑名单
+          grep '^@@||' tmp/all_deduped.txt > tmp/whitelist.txt
+          grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist.txt
 
-          # 找到冲突（后缀完全一致）
-          sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
-          grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
+          echo "⚡ 处理黑白名单抵消规则..."
+          # 取白名单后缀部分
+          awk '{sub(/^@@\|\|/, ""); print}' tmp/whitelist.txt | sort > tmp/w_suffix.txt
+          awk '{sub(/^\|\|/, ""); print}' tmp/blocklist.txt | sort > tmp/b_suffix.txt
+          # 找到冲突（后缀完全相同）
+          comm -12 tmp/w_suffix.txt tmp/b_suffix.txt > tmp/conflict_suffix.txt
 
-          # 删除冲突
-          grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
-          grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
+          # 删除抵消规则
+          while read -r suf; do
+            sed -i "\|^@@||${suf}$|d" tmp/whitelist.txt
+            sed -i "\|^||${suf}$|d" tmp/blocklist.txt
+          done < tmp/conflict_suffix.txt
 
-          # 添加头部信息
+          # 统计
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
+          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
+          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
+          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
-          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
+          CONFLICT_COUNT=$(wc -l < tmp/conflict_suffix.txt)
+          WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
+          echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
+          echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
+          echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
+          echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
+          echo "黑名单条数：$BLACKLIST_COUNT" | tee -a dist/old_rules.txt
+          echo "抵消数量：$CONFLICT_COUNT" | tee -a dist/old_rules.txt
+          echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
+          echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
+
+          # 添加头部信息并写入 dist/
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
 
@@ -81,37 +85,13 @@ jobs:
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
 
-          # 输出统计
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
-          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-          echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
-          echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
-          echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
-          echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
-          echo "黑名单条数：$BLACKLIST_COUNT" | tee -a dist/old_rules.txt
-          echo "冲突抵消数量：$CONFLICT_COUNT" | tee -a dist/old_rules.txt
-          echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
-
       - name: Commit Changes
         id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          WHITELIST_LINES=$(wc -l < dist/whitelist.txt)
-          BLACKLIST_LINES=$(wc -l < dist/blocklist.txt)
-          TOTAL_LINES=$((WHITELIST_LINES + BLACKLIST_LINES))
-          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
-          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-
-          NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
-          [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
-          COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-
+          COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: 0 | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
+          
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
@@ -140,13 +120,9 @@ jobs:
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
+          echo "------------------------------------------------------------"
           echo "📁 白名单文件路径：dist/whitelist.txt"
           echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
           echo "📁 黑名单文件路径：dist/blocklist.txt"
           echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
-          echo "冲突抵消数量：$(wc -l < tmp/conflict_core.txt)"
-          echo "前 20 行白名单示例："
-          head -n 20 dist/whitelist.txt
-          echo "前 20 行黑名单示例："
-          head -n 20 dist/blocklist.txt
           echo "============================================================"
