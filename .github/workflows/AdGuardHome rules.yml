@@ -53,30 +53,25 @@ jobs:
           echo "📊 去重并排序（LC_ALL=C sort -u）..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
 
-          # ✅ 将白名单和黑名单分开
-          grep '^@@||' tmp/all_deduped.txt > tmp/whitelist.txt
-          grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist.txt
+          # ✅ 将白名单和黑名单分开并输出到 dist/
+          grep '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/whitelist.txt
+          grep -v '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/blocklist.txt
 
           # ⏰ 使用北京时间
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-          WHITELIST_COUNT=$(grep -c '^@@||' tmp/all_deduped.txt)
+          WHITELIST_COUNT=$(wc -l < dist/whitelist.txt)
+          BLACKLIST_COUNT=$(wc -l < dist/blocklist.txt)
           WHITE_RATIO=$(awk "BEGIN {printf \"%.2f\", (${WHITELIST_COUNT}/${DEDUP_COUNT})*100}")
 
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
           echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
+          echo "黑名单条数：$BLACKLIST_COUNT" | tee -a dist/old_rules.txt
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          # 排序白名单和黑名单按父域（保留符号）
-          echo "📜 排序白名单规则..."
-          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt > dist/whitelist.txt
-
-          echo "📜 排序黑名单规则..."
-          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt > dist/blocklist.txt
-
-      # 下面的 Commit / Release / Show 部分保持不变
+      # Commit / Release / Show 部分保持不变
