@@ -101,50 +101,57 @@ diff_w = current_w - last_w
 diff_b = current_b - last_b
 
 # ===============================
-# 🧾 生成统一头部信息
+# 🧾 生成白名单/黑名单独立头部信息
 # ===============================
-def generate_header():
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    diff_w_str = f"增加 {diff_w} 条" if diff_w > 0 else f"减少 {abs(diff_w)} 条" if diff_w < 0 else "无变化 0 条"
-    diff_b_str = f"增加 {diff_b} 条" if diff_b > 0 else f"减少 {abs(diff_b)} 条" if diff_b < 0 else "无变化 0 条"
-
+def generate_whitelist_header():
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S CST')
+    diff_str = f"增加 {diff_w} 条" if diff_w > 0 else f"减少 {abs(diff_w)} 条" if diff_w < 0 else "无变化 0 条"
     header = f"""###########################################################
-# 📅 AdGuardHome 综合规则自动构建信息
-# ⏰ 更新时间: {now} CST
-# 🌐 规则来源:
-#   白名单: {whitelist_url}
-#   黑名单: {blocklist_url}
+# 📅 AdGuardHome 白名单信息
+# ⏰ 更新时间: {now}
+# 🌐 来源: {whitelist_url}
 # --------------------------------------------------------
 # 📊 白名单统计:
 #   ▸ 原始规则数量: {len(whitelist)}
 #   ▸ 删除子域数量: {deleted_whitelist}
 #   ▸ 清理后规则数量: {current_w}
-#   ▸ 与上次对比: {diff_w_str}
+#   ▸ 与上次对比: {diff_str}
+# --------------------------------------------------------
+# 🧩 说明:
+#   当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
+# ==========================================================
+"""
+    return header
+
+def generate_blocklist_header():
+    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S CST')
+    diff_str = f"增加 {diff_b} 条" if diff_b > 0 else f"减少 {abs(diff_b)} 条" if diff_b < 0 else "无变化 0 条"
+    header = f"""###########################################################
+# 📅 AdGuardHome 黑名单信息
+# ⏰ 更新时间: {now}
+# 🌐 来源: {blocklist_url}
 # --------------------------------------------------------
 # 📊 黑名单统计:
 #   ▸ 原始规则数量: {len(blocklist)}
 #   ▸ 删除子域数量: {deleted_blocklist}
 #   ▸ 清理后规则数量: {current_b}
-#   ▸ 与上次对比: {diff_b_str}
+#   ▸ 与上次对比: {diff_str}
 # --------------------------------------------------------
 # 🧩 说明:
-#   1️⃣ 当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
-#   2️⃣ 多级子域（三级、四级）则保留级数更低的域名（父域）。
+#   当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
 # ==========================================================
 """
     return header
-
-header = generate_header()
 
 # ===============================
 # 💾 输出为两个文件
 # ===============================
 with open("cleaned_whitelist.txt", "w", encoding="utf-8") as f:
-    f.write(header + "\n")
+    f.write(generate_whitelist_header() + "\n")
     f.write("\n".join(sorted(cleaned_whitelist)) + "\n")
 
 with open("cleaned_blocklist.txt", "w", encoding="utf-8") as f:
-    f.write(header + "\n")
+    f.write(generate_blocklist_header() + "\n")
     f.write("\n".join(sorted(cleaned_blocklist)) + "\n")
 
 # 保存最新数量
