@@ -30,11 +30,11 @@ jobs:
             "https://anti-ad.net/easylist.txt"
             "https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt"
             "https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt"
-            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"
-            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"
-            "https://easylist-downloads.adblockplus.org/easylistchina.txt"
-            "https://easylist-downloads.adblockplus.org/easylist.txt"
-            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"
+            "https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt"            
+            "https://easylist-downloads.adblockplus.org/easyprivacy.txt"            
+            "https://easylist-downloads.adblockplus.org/easylistchina.txt"            
+            "https://easylist-downloads.adblockplus.org/easylist.txt"            
+            "https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt"  
             "https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt"
             "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt"
             "https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt"
@@ -50,18 +50,18 @@ jobs:
           echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序白名单（LC_ALL=C sort -u）..."
+          echo "📊 去重并排序白名单..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped_tmp.txt
 
-          # ✅ 将白名单和黑名单分开
+          # 分离白名单与黑名单
           grep '^@@||' tmp/all_deduped_tmp.txt > tmp/whitelist.txt
           grep -v '^@@||' tmp/all_deduped_tmp.txt > tmp/blocklist.txt
 
-          # ✅ wxglenovo 源内白名单优先置顶
+          # wxglenovo 白名单优先
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
-          # 合并 wxglenovo 白名单 + 其他白名单 + 黑名单，保持去重
+          # 合并 wxglenovo 白名单 + 其他白名单 + 黑名单，去重
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | LC_ALL=C sort -u > tmp/all_deduped.txt
 
           # ⏰ 使用北京时间
@@ -81,19 +81,22 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          # ✅ 排序并按父域排序（保留符号）
-          echo "📜 排序白名单规则..."
-          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt > dist/whitelist.txt
+          # 添加头部信息
+          WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
+          BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
 
-          echo "📜 排序黑名单规则..."
-          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt > dist/blocklist.txt
+          # 排序并写入 dist/
+          echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
+          grep '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 >> dist/whitelist.txt
+
+          echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
+          grep -v '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 >> dist/blocklist.txt
 
       - name: Commit Changes
         id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          NEW_COUNT=$(wc -l < dist/whitelist.txt)
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
