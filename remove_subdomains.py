@@ -3,7 +3,7 @@ import requests
 import os
 from datetime import datetime
 
-# GitHub 上的白名单和黑名单
+# GitHub 上的白名单和黑名单文件
 whitelist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
 blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt'
 
@@ -18,7 +18,7 @@ def fetch_file(url):
         print(f"获取文件失败: {e}")
         exit(1)
 
-# 读取规则
+# 获取规则文件
 whitelist = fetch_file(whitelist_url)
 blocklist = fetch_file(blocklist_url)
 
@@ -39,6 +39,7 @@ def process_rules(rules):
             cleaned.append(line)
             continue
 
+        # 匹配 || 或 @@|| 开头规则
         m = re.match(r'(@@?\|\|)([^/^\$]+)(.*)', line)
         if m:
             prefix, domain, suffix = m.groups()
@@ -49,6 +50,7 @@ def process_rules(rules):
                 seen[key] = line
                 cleaned.append(line)
             else:
+                # 父域 + 后缀已存在，删除子域规则
                 deleted_count += 1
                 continue
         else:
@@ -56,10 +58,8 @@ def process_rules(rules):
 
     return cleaned, deleted_count
 
-# 处理白名单
+# 处理白名单和黑名单
 cleaned_whitelist, deleted_whitelist = process_rules(whitelist)
-
-# 处理黑名单
 cleaned_blocklist, deleted_blocklist = process_rules(blocklist)
 
 # 读取上次数量
