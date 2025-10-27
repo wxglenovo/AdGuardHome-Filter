@@ -50,7 +50,7 @@ jobs:
           echo "🧹 清理注释、系统提示与空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序白名单..."
+          echo "📊 去重并排序..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped_tmp.txt
 
           # 分离白名单与黑名单
@@ -61,7 +61,7 @@ jobs:
           curl -sSL --retry 3 --fail "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/Create%20a%20Custom%20AdGuard%20Home%20Filtering%20Rule.txt" \
             | grep '^@@||' > tmp/source_whitelist.txt
 
-          # 合并 wxglenovo 白名单 + 其他白名单 + 黑名单，去重
+          # 合并所有规则，去重
           cat tmp/source_whitelist.txt tmp/whitelist.txt tmp/blocklist.txt | LC_ALL=C sort -u > tmp/all_deduped.txt
 
           # ⏰ 使用北京时间
@@ -97,15 +97,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          NEW_COUNT=$(wc -l < dist/whitelist.txt)
+          NEW_ADDED=$((DEDUP_COUNT - NEW_COUNT + WHITELIST_COUNT + BLACKLIST_COUNT))
+          [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
+          COMMIT_MSG="🧩AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT}"
+          
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
           else
             echo "no_change=false" >> $GITHUB_OUTPUT
-            git commit -m "🧩 更新 AdGuardHome 规则"
+            git commit -m "$COMMIT_MSG"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
           fi
 
       - name: Create or Update Release
@@ -115,7 +121,7 @@ jobs:
           tag_name: "v${{ github.run_number }}"
           name: "🧩 AdGuardHome Rules"
           body: |
-            更新 AdGuardHome 白名单和黑名单
+            ${{ steps.commit.outputs.commit_message }}
           files: |
             dist/whitelist.txt
             dist/blocklist.txt
