@@ -1,13 +1,13 @@
 ###########################################################
 # 📅 AdGuardHome 白名单信息
-# ⏰ 更新时间: 2025-10-27 12:42:02 CST
+# ⏰ 更新时间: 2025-10-27 13:26:49 CST
 # 🌐 来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
 # 📊 白名单统计:
-#   ▸ 原始规则数量: 2785
-#   ▸ 删除子域数量: 103
-#   ▸ 清理后规则数量: 2682
-#   ▸ 与上次对比: 减少 2 条
+#   ▸ 原始规则数量: 2805
+#   ▸ 删除子域数量: 121
+#   ▸ 清理后规则数量: 2684
+#   ▸ 与上次对比: 增加 2 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
@@ -460,6 +460,7 @@
 @@||att.com/ui/services_co_myatt_common/$script,~third-party
 @@||att.tv^*/VisitorAPI.js$script,~third-party
 @@||atwiki.jp/common/_img/spacer.gif?$image,domain=atwiki.jp
+@@||au.download.windowsupdate.com^
 @@||ausha.tsbluebox.com^$media,domain=podcast.ausha.co
 @@||auth2.picpay.com^*/event-tracking.js$script,~third-party
 @@||autocomplete.clearbit.com^
@@ -1411,7 +1412,7 @@
 @@||jwpcdn.com/player/plugins/googima/$script,domain=iheart.com|video.vice.com
 @@||jwpcdn.com/player/plugins/googima/*/googima.js$domain=viu.tv
 @@||k-img.com/script/analytics/s_code.js$script,domain=kakaku.com
-@@||k.sinaimg.cn^
+@@||k.sinaimg.cn
 @@||k12-company.ru^*/statistics.js$script
 @@||kabumap.com/servlets/kabumap/html/common/img/ad/$~third-party
 @@||kaitao.cn/public/wenda/ad/css/ds-un-detail.css
@@ -1911,6 +1912,7 @@
 @@||preromanbritain.com/maxymiser/$~third-party
 @@||privatbank.ua/content/*/fp2.min.js$~third-party
 @@||pro.gooooal.com/ad/ad_2.js
+@@||productionresultssa5.blob.core.windows.net^
 @@||promo.com/embed/$subdocument,third-party
 @@||promo.zendesk.com^$xmlhttprequest,domain=promo.com
 @@||proton.me^$generichide
