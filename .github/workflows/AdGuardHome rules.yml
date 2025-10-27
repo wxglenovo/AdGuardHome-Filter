@@ -50,15 +50,23 @@ jobs:
             echo "" >> tmp/all_raw.txt
           done
 
+          echo "✅ 下载完成，原始规则行数: $(wc -l < tmp/all_raw.txt)"
+
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
+          echo "✅ 清理完成，行数: $(wc -l < tmp/all_cleaned.txt)"
 
           echo "📊 去重并排序 (LC_ALL=C sort -u)..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
+          echo "✅ 去重完成，行数: $(wc -l < tmp/all_deduped.txt)"
 
           # 分离白名单和黑名单
+          echo "📂 分离白名单和黑名单..."
           grep '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/whitelist.txt || true
           grep -v '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/blocklist.txt || true
+
+          echo "✅ 白名单行数: $(wc -l < dist/whitelist.txt)"
+          echo "✅ 黑名单行数: $(wc -l < dist/blocklist.txt)"
 
           # 输出统计信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
@@ -77,7 +85,7 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          echo "✅ 文件生成完成，dist/目录文件列表:"
+          echo "📁 dist目录文件列表:"
           ls -l dist/
           echo "前 10 行 whitelist:"
           head -n 10 dist/whitelist.txt
