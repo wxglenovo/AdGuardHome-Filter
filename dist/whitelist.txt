@@ -1,7 +1,7 @@
 ! =====================
 ! AdGuardHome 白名单
-! 更新时间: 2025-10-27 20:54:34 CST
-! 总条数: 2784
+! 更新时间: 2025-10-27 21:25:42 CST
+! 总条数: 2804
 ! =====================
 
 @@||*/assets/js/common/juqery/
@@ -174,6 +174,7 @@
 @@||ad.azure.com^
 @@||edgestatic.azureedge.net^
 @@||loader-cdn.azureedge.net/prod/smi/loader.min.js$domain=pressdemocrat.com
+@@||msedge.b.tlu.dl.delivery.mp.microsoft.com^
 @@||dmhy.b168.net^$generichide
 @@||api.babbel.io/gamma/v1/$ping,domain=babbel.com
 @@||baozhang.baidu.com^
@@ -217,6 +218,7 @@
 @@||dd.blackhawknetwork.com.first-party-js.datadome.co^$domain=redeem.rewardlink.com
 @@||lightning.bleacherreport.com/launch/*-source.min.js$~third-party
 @@||lightning.bleacherreport.com^*/launch-$~third-party
+@@||productionresultssa5.blob.core.windows.net^
 @@||ab.blogs.es/abtest.png$domain=trendencias.com|xataka.com
 @@||elife-cloud.blogspot.com^$generichide
 @@||sourcepointcmp.bloomberg.*/ccpa.js$script,domain=bloomberg.co.jp|bloomberg.com
@@ -1548,6 +1550,7 @@
 @@||jetzt.de^$generichide
 @@||energy.de^*/ivw.js?$domain=energy.de
 @@||iis1.deliver.ifeng.com/showcode?$domain=v.ifeng.com
+@@||fe3cr.delivery.mp.microsoft.com^
 @@||adobedc.demdex.net/ee/v1/identity/$xmlhttprequest,domain=cibc.com
 @@||apps.derstandard.at^*/TrackingCookieCheck?$subdocument
 @@||xhamster.desi^$script,~third-party
@@ -1565,6 +1568,7 @@
 @@||politiken.dk/static/$script
 @@||ku.dk^
 @@||kanalfrederikshavn.dk^*/jquery.openx.js?
+@@||tlu.dl.delivery.mp.microsoft.com^
 @@||play.dlsite.com/csr/viewer/lib/newrelic.js
 @@||vendorlist.dmcdn.net^
 @@||banner.dna.fi^
@@ -1602,6 +1606,8 @@
 @@||cs-op.douyucdn.cn/dycatr^
 @@||cs-op.douyucdn.cn/vod-cover^
 @@||cs-op.douyucdn.cn/vod-index^
+@@||au.download.windowsupdate.com^
+@@||storeedgefd.dsx.mp.microsoft.com^
 @@||tube.e.kuaishou.com^
 @@||webquotepic.eastmoney.com^
 @@||www.eastmoney.com^
@@ -1644,6 +1650,7 @@
 @@||ocdn.eu/ucs/static/*/onesignal.js$script,domain=pulsonline.rs
 @@||cookie-bar.eu^
 @@||ec.europa.eu/eurostat/databrowser/assets/analytics/piwik.js$script,~third-party
+@@||browser.events.data.microsoft.com^
 @@||functional.events.data.microsoft.com
 @@||cdn.ex.co^$domain=mm-watch.com|theautopian.com
 @@||embed.ex.co^$xmlhttprequest,domain=espncricinfo.com
@@ -2060,6 +2067,7 @@
 @@||edge.microsoft.com^
 @@||go.microsoft.com^
 @@||insideruser.microsoft.com^
+@@||learn.microsoft.com^
 @@||support.microsoft.com^
 @@||teams.microsoft.com/dialin-cdn-root/*/aria-web-telemetry-$~third-party
 @@||teams.microsoft.com^$generichide
@@ -2083,6 +2091,7 @@
 @@||download.mokeedev.com^$genericblock,generichide
 @@||datadome.monster.com.first-party-js.datadome.co^$script,domain=monster.com
 @@||stapewithadblock.monster^$generichide
+@@||displaycatalog.mp.microsoft.com^
 @@||licensing.mp.microsoft.com^
 @@||purchase.mp.microsoft.com^
 @@||identity.mparticle.com^$xmlhttprequest
@@ -2490,6 +2499,7 @@
 @@||chart-embed.service.newrelic.com^
 @@||chart-embed.service.newrelic.com^$subdocument,xmlhttprequest
 @@||marketingautomation.services^$script,domain=leeuwerik.nl
+@@||msedgeextensions.sf.tlu.dl.delivery.mp.microsoft.com^
 @@||morphic.sh^$generichide
 @@||ignitetv.shaw.ca/js/api/fingerprint.js$~third-party
 @@||codicefl.shinystat.com/cgi-bin/getserver.cgi?$script,domain=3bmeteo.com|quotidiano.net
@@ -2503,13 +2513,14 @@
 @@||sax.sina.com.cn/video/newimpress?
 @@||sax.sina.com.cn^
 @@||i3.sinaimg.cn/video/deco/2013/0325/js/
-@@||k.sinaimg.cn^
+@@||k.sinaimg.cn
 @@||wx3.sinaimg.cn/large^$app=com.xiaoyin.love
 @@||wx3.sinaimg.cn/wap720^
 @@||adserver.skiresort-service.com/www/delivery/spcjs.php?$script,domain=skiresort.de|skiresort.fr|skiresort.info|skiresort.it|skiresort.nl
 @@||portal.skyid.no^
 @@||files.slack.com^$image,~third-party
 @@||api.slightcommunicativeinterconnectedness.xyz^
+@@||tas02.sls.update.microsoft.com^
 @@||cdn.smartclip-services.com^$script,domain=cerebriti.com
 @@||webmail.smartlinkcorp.com/dotrans_20160909.php
 @@||ad.smartmediarep.com/NetInsight/video/smr$domain=programs.sbs.co.kr
@@ -2552,6 +2563,8 @@
 @@||cdn.staticfile.org^$script,domain=00ksw.com|147xiaoshuo.com|31xs.org|31xsxs.com|35xs.org|biquge18.com|biququ.info|manhuadui.com|qihaoqihao.com|rijutv.com|tsxsw.net|xbiqugexsw.com|xx31xs.org|ziyouge.com
 @@||cdn.staticfile.org^$script,domain=movieffm.net
 @@||console.statsig.com/_next/$~third-party
+@@||pti.store.microsoft.com^
+@@||cdn.storeedgefd.dsx.mp.microsoft.com^
 @@||store.storeimages.cdn-apple.com^*/appmeasurement.js$domain=apple.com
 @@||webcdn.stream.ne.jp^*/referrer.js$domain=stream.ne.jp
 @@||live.streamtheworld.com/partnerIds$domain=iheart.com|player.amperwave.net
@@ -2680,6 +2693,8 @@
 @@||online.unionpay.com/ads/$script
 @@||marketing.unionpayintl.com/offer-promote/static/sensorsdata.min.js$script,~third-party
 @@||iwrite.unipus.cn/js/main/GPT.js$~third-party
+@@||fe2cr.update.microsoft.com^
+@@||slscr.update.microsoft.com^
 @@||www.ups.com/WebTracking/processInputRequest
 @@||stats.uptimerobot.com^
 @@||web-sdk.urbanairship.com/notify/$script,domain=etoro.com
@@ -2729,11 +2744,16 @@
 @@||commons.wikimedia.org/w/api.php?$~third-party,xmlhttprequest
 @@||upload.wikimedia.org/wikipedia/$image,media
 @@||youneed.win^$generichide
+@@||activity.windows.com^
+@@||adl.windows.com^
 @@||core.windows.net^*/annonser/$image,domain=kmauto.no
 @@||time.windows.com^
+@@||ctldl.windowsupdate.com^
+@@||download.windowsupdate.com^
 @@||j.wit.qq.com/sc/crystal_ad.js?$domain=888.sports.qq.com
 @@||dd.wizzair.com.first-party-js.datadome.co^$domain=wizzair.com
 @@||stats.wnba.com/templates/angular/tables/events/$~third-party
+@@||client.wns.windows.com^
 @@||docs.woopt.com/wgact/$image,~third-party,xmlhttprequest
 @@||adsense.woso.cn^$~third-party
 @@||s1.wp.com^
