@@ -2,43 +2,46 @@
 import re
 import requests
 from datetime import datetime
+from pathlib import Path
 
 # ==========================================================
 # 📌 规则来源
 # ==========================================================
-whitelist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
-blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt'
+whitelist_url = "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt"
+blocklist_url = "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt"
 
 # ==========================================================
-# 📌 下载规则文件
+# 📌 下载规则
 # ==========================================================
 def download_rules(url):
-    print(f"📥 正在下载: {url}")
+    print(f"📥 正在下载规则文件: {url}")
     resp = requests.get(url, timeout=60)
-    resp.encoding = 'utf-8'
+    resp.encoding = "utf-8"
     lines = [line.strip() for line in resp.text.splitlines() if line.strip()]
+    # 删除以 "!" 开头的旧头部信息
+    lines = [l for l in lines if not l.startswith("!")]
     return lines
 
 # ==========================================================
 # 📌 提取域名与规则后缀
 # ==========================================================
 def extract_domain_and_suffix(rule):
-    match = re.match(r'(@@)?\|\|([^/^$]+)(.*)', rule)
+    match = re.match(r"(@@)?\|\|([^/^$]+)(.*)", rule)
     if match:
-        prefix = match.group(1) or ''
-        domain = match.group(2).strip('.')
+        prefix = match.group(1) or ""
+        domain = match.group(2).strip(".")
         suffix = match.group(3)
         return prefix, domain, suffix
-    return '', '', ''
+    return "", "", ""
 
 # ==========================================================
 # 📌 判断是否为子域
 # ==========================================================
 def is_subdomain(child, parent):
-    return child.endswith('.' + parent)
+    return child.endswith("." + parent)
 
 # ==========================================================
-# 📌 清理逻辑：删除父域 + 子域重复项
+# 📌 清理逻辑：删除父域 + 子域重复项（后缀完全一致）
 # ==========================================================
 def clean_rules(rules):
     parsed = []
@@ -47,8 +50,7 @@ def clean_rules(rules):
         if domain:
             parsed.append((prefix, domain, suffix, rule))
 
-    # 按域名级数排序（低级在前）
-    parsed.sort(key=lambda x: x[1].count('.'))
+    parsed.sort(key=lambda x: x[1].count("."))
     skip = set()
 
     for i, (prefix_i, domain_i, suffix_i, rule_i) in enumerate(parsed):
@@ -56,15 +58,19 @@ def clean_rules(rules):
             continue
         for j, (prefix_j, domain_j, suffix_j, rule_j) in enumerate(parsed):
             if i != j and rule_j not in skip:
-                # 删除子域（前缀和后缀完全一致时）
-                if is_subdomain(domain_j, domain_i) and suffix_i == suffix_j and prefix_i == prefix_j:
+                # 当父域 + 子域后缀一致，删除子域规则
+                if (
+                    prefix_i == prefix_j
+                    and suffix_i == suffix_j
+                    and is_subdomain(domain_j, domain_i)
+                ):
                     skip.add(rule_j)
 
     cleaned = [rule for _, _, _, rule in parsed if rule not in skip]
     return cleaned, len(skip)
 
 # ==========================================================
-# 📌 生成头部信息（无 “!” 内容）
+# 📌 生成头部信息
 # ==========================================================
 def build_header(stats):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S CST")
@@ -94,14 +100,15 @@ def build_header(stats):
 # 📌 主执行逻辑
 # ==========================================================
 def main():
-    print("📥 开始下载规则文件...")
+    print("🚀 开始处理 AdGuardHome 规则...")
+
     whitelist = download_rules(whitelist_url)
     blocklist = download_rules(blocklist_url)
 
-    print("🧹 清理白名单...")
+    print("🧹 清理白名单中子域规则...")
     cleaned_white, removed_white = clean_rules(whitelist)
 
-    print("🧹 清理黑名单...")
+    print("🧹 清理黑名单中子域规则...")
     cleaned_black, removed_black = clean_rules(blocklist)
 
     stats = {
@@ -115,12 +122,16 @@ def main():
 
     header = build_header(stats)
     all_rules = cleaned_white + cleaned_black
-    output = header + "\n".join(all_rules) + "\n"
+    output_text = header + "\n".join(all_rules) + "\n"
 
-    with open("AdGuardHome_Filter.txt", "w", encoding="utf-8") as f:
-        f.write(output)
+    Path("dist").mkdir(exist_ok=True)
+    output_path = Path("dist/AdGuardHome_Filter.txt")
 
-    print("✅ 规则构建完成 → AdGuardHome_Filter.txt")
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(output_text)
+
+    print(f"✅ 规则已生成 → {output_path}")
+    print(f"📊 白名单清理 {removed_white} 条，黑名单清理 {removed_black} 条。")
 
 # ==========================================================
 if __name__ == "__main__":
