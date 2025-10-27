@@ -21,7 +21,9 @@ jobs:
 
       - name: Download & Merge Rules (Clean + Deduplicate)
         run: |
+          set -e
           mkdir -p dist tmp
+
           urls=(
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt"
             "https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt"
@@ -41,23 +43,24 @@ jobs:
           )
 
           echo "📥 开始下载并合并所有规则..."
+          rm -f tmp/all_raw.txt tmp/all_cleaned.txt tmp/all_deduped.txt
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
 
-          echo "🧹 清理注释、系统提示与空行..."
+          echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并排序（LC_ALL=C sort -u）..."
+          echo "📊 去重并排序 (LC_ALL=C sort -u)..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
 
-          # ✅ 将白名单和黑名单分开并输出到 dist/
-          grep '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/whitelist.txt
-          grep -v '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/blocklist.txt
+          # 分离白名单和黑名单
+          grep '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/whitelist.txt || true
+          grep -v '^@@||' tmp/all_deduped.txt | LC_ALL=C sort -t'.' -k2,2 -k1,1 > dist/blocklist.txt || true
 
-          # ⏰ 使用北京时间
+          # 输出统计信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
@@ -74,4 +77,9 @@ jobs:
           echo "白名单比例：${WHITE_RATIO}%" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-      # Commit / Release / Show 部分保持不变
+          echo "✅ 文件生成完成，dist/目录文件列表:"
+          ls -l dist/
+          echo "前 10 行 whitelist:"
+          head -n 10 dist/whitelist.txt
+          echo "前 10 行 blocklist:"
+          head -n 10 dist/blocklist.txt
