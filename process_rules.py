@@ -1,131 +1,135 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import re
 import requests
-import os
 from datetime import datetime
+from urllib.parse import urlparse
 
 # ==========================================================
-# 白名单和黑名单源地址
+# 📌 规则来源
 # ==========================================================
 whitelist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
 blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt'
-last_count_file = "last_count.txt"
+
 # ==========================================================
+# 📌 下载规则文件
+# ==========================================================
+def download_rules(url):
+    resp = requests.get(url, timeout=60)
+    resp.encoding = 'utf-8'
+    lines = [line.strip() for line in resp.text.splitlines() if line.strip()]
+    return lines
 
-def fetch_file(url):
-    """获取远程规则文件"""
-    try:
-        r = requests.get(url)
-        r.raise_for_status()
-        return r.text.splitlines()
-    except requests.RequestException as e:
-        print(f"❌ 获取文件失败: {e}")
-        exit(1)
+# ==========================================================
+# 📌 提取域名与规则后缀
+# ==========================================================
+def extract_domain_and_suffix(rule):
+    match = re.match(r'(@@)?\|\|([^/^$]+)(.*)', rule)
+    if match:
+        prefix = match.group(1) or ''
+        domain = match.group(2).strip('.')
+        suffix = match.group(3)
+        return prefix, domain, suffix
+    return '', '', ''
 
-# 获取规则内容
-whitelist = fetch_file(whitelist_url)
-blocklist = fetch_file(blocklist_url)
+# ==========================================================
+# 📌 判断是否为子域
+# ==========================================================
+def is_subdomain(child, parent):
+    return child.endswith('.' + parent)
 
-def get_base_domain(domain):
-    """提取主域（例如 a.b.example.com -> example.com）"""
-    parts = domain.split('.')
-    if len(parts) >= 2:
-        return '.'.join(parts[-2:])
-    return domain
+# ==========================================================
+# 📌 清理逻辑
+# ==========================================================
+def clean_rules(rules):
+    parsed = []
+    for rule in rules:
+        prefix, domain, suffix = extract_domain_and_suffix(rule)
+        if domain:
+            parsed.append((prefix, domain, suffix, rule))
 
-def process_rules(rules):
-    """根据父域+后缀去重，只保留父域规则"""
-    seen = {}
     cleaned = []
-    deleted_count = 0
+    domains = sorted(parsed, key=lambda x: x[1].count('.'))  # 按级数从低到高
 
-    for line in rules:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            cleaned.append(line)
+    skip = set()
+    for i, (prefix_i, domain_i, suffix_i, rule_i) in enumerate(domains):
+        if rule_i in skip:
             continue
+        for j, (prefix_j, domain_j, suffix_j, rule_j) in enumerate(domains):
+            if i != j and rule_j not in skip:
+                if is_subdomain(domain_j, domain_i) and suffix_i == suffix_j and prefix_i == prefix_j:
+                    skip.add(rule_j)
+    for prefix, domain, suffix, rule in domains:
+        if rule not in skip:
+            cleaned.append(rule)
 
-        # 匹配 || 或 @@|| 开头的域名规则
-        m = re.match(r'(@@?\|\|)([^/^\$]+)(.*)', line)
-        if m:
-            prefix, domain, suffix = m.groups()
-            base = get_base_domain(domain)
-            key = (base, suffix)
-
-            if key not in seen:
-                seen[key] = line
-                cleaned.append(line)
-            else:
-                deleted_count += 1
-        else:
-            cleaned.append(line)
-
-    return cleaned, deleted_count
-
-
-# 执行白名单和黑名单去重
-cleaned_whitelist, deleted_whitelist = process_rules(whitelist)
-cleaned_blocklist, deleted_blocklist = process_rules(blocklist)
+    return cleaned, len(skip)
 
 # ==========================================================
-# 读取与写入历史记录
+# 📌 输出头部信息
 # ==========================================================
-def read_last_count():
-    if os.path.exists(last_count_file):
-        with open(last_count_file, 'r') as f:
-            lines = f.read().splitlines()
-            if len(lines) >= 2:
-                return int(lines[0]), int(lines[1])
-    return 0, 0
-
-def write_current_count(w_count, b_count):
-    with open(last_count_file, 'w') as f:
-        f.write(f"{w_count}\n{b_count}\n")
-
-current_w = len(cleaned_whitelist)
-current_b = len(cleaned_blocklist)
-last_w, last_b = read_last_count()
-diff_w = current_w - last_w
-diff_b = current_b - last_b
-write_current_count(current_w, current_b)
+def build_header(stats):
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S CST")
+    header = f"""###########################################################
+# 📅 AdGuardHome 综合规则自动构建信息
+# ⏰ 更新时间: {now}
+# 🌐 规则来源:
+#   白名单: {whitelist_url}
+#   黑名单: {blocklist_url}
+# --------------------------------------------------------
+# 📊 白名单统计:
+#   ▸ 原始规则数量: {stats['white_total']}
+#   ▸ 删除子域数量: {stats['white_removed']}
+#   ▸ 清理后规则数量: {stats['white_final']}
+# --------------------------------------------------------
+# 📊 黑名单统计:
+#   ▸ 原始规则数量: {stats['black_total']}
+#   ▸ 删除子域数量: {stats['black_removed']}
+#   ▸ 清理后规则数量: {stats['black_final']}
+# --------------------------------------------------------
+# 🧩 规则处理逻辑说明:
+#   1️⃣ 当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
+#   2️⃣ 多级子域（如三级、四级）则保留级数更低的域名（父域）。
+#   3️⃣ 若无匹配子域，仅保留主规则（如 @@||baidu.com^*&cb=BaiduSuggestion）。
 # ==========================================================
-
-
-# ==========================================================
-# 统一头部信息（白名单 + 黑名单整合显示）
-# ==========================================================
-header = [
-    "###########################################################",
-    "# 📅 AdGuardHome 综合规则自动构建信息",
-    f"# ⏰ 更新时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-    "# 🌐 规则来源:",
-    f"#   白名单: {whitelist_url}",
-    f"#   黑名单: {blocklist_url}",
-    "# --------------------------------------------------------",
-    f"# 白名单原始规则数量: {len(whitelist)}",
-    f"# 白名单删除子域数量: {deleted_whitelist}",
-    f"# 白名单清理后规则数量: {current_w}",
-    f"# 白名单与上次对比: {('增加' if diff_w>0 else '减少' if diff_w<0 else '无变化')} {abs(diff_w)} 条",
-    "# --------------------------------------------------------",
-    f"# 黑名单原始规则数量: {len(blocklist)}",
-    f"# 黑名单删除子域数量: {deleted_blocklist}",
-    f"# 黑名单清理后规则数量: {current_b}",
-    f"# 黑名单与上次对比: {('增加' if diff_b>0 else '减少' if diff_b<0 else '无变化')} {abs(diff_b)} 条",
-    "# --------------------------------------------------------",
-    "# 说明: 当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。",
-    "# 多级子域（三级、四级）则保留级数更低的域名（父域）。",
-    "# ==========================================================",
-    ""
-]
+! =====================
+! 🔰 AdGuardHome 综合规则开始
+! =====================
+"""
+    return header
 
 # ==========================================================
-# 输出结果文件
+# 📌 主执行逻辑
 # ==========================================================
-def write_file(filename, header, rules):
-    with open(filename, "w", encoding="utf-8") as f:
-        f.write('\n'.join(header))
-        f.write('\n'.join(sorted(rules)) + '\n')
+def main():
+    print("📥 开始下载规则文件...")
+    whitelist = download_rules(whitelist_url)
+    blocklist = download_rules(blocklist_url)
 
-write_file("cleaned_whitelist.txt", header, cleaned_whitelist)
-write_file("cleaned_blocklist.txt", header, cleaned_blocklist)
+    print("🧹 开始清理白名单规则...")
+    cleaned_white, removed_white = clean_rules(whitelist)
 
-print("✅ 白名单与黑名单已清理完毕，并生成统一头部信息。")
+    print("🧹 开始清理黑名单规则...")
+    cleaned_black, removed_black = clean_rules(blocklist)
+
+    stats = {
+        "white_total": len(whitelist),
+        "white_removed": removed_white,
+        "white_final": len(cleaned_white),
+        "black_total": len(blocklist),
+        "black_removed": removed_black,
+        "black_final": len(cleaned_black),
+    }
+
+    header = build_header(stats)
+    output = header + "\n".join(cleaned_white + cleaned_black)
+
+    with open("AdGuardHome_Filter.txt", "w", encoding="utf-8") as f:
+        f.write(output)
+
+    print("✅ 构建完成，输出文件：AdGuardHome_Filter.txt")
+
+# ==========================================================
+if __name__ == "__main__":
+    main()
