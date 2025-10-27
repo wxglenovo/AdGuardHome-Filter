@@ -3,7 +3,7 @@ import requests
 import os
 from datetime import datetime
 
-# GitHub 上的白名单和黑名单文件
+# 白名单和黑名单 URL
 whitelist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
 blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt'
 
@@ -18,7 +18,7 @@ def fetch_file(url):
         print(f"获取文件失败: {e}")
         exit(1)
 
-# 获取规则文件
+# 获取规则
 whitelist = fetch_file(whitelist_url)
 blocklist = fetch_file(blocklist_url)
 
@@ -50,7 +50,6 @@ def process_rules(rules):
                 seen[key] = line
                 cleaned.append(line)
             else:
-                # 父域 + 后缀已存在，删除子域规则
                 deleted_count += 1
                 continue
         else:
@@ -71,16 +70,12 @@ def read_last_count():
                 return int(lines[0]), int(lines[1])
     return 0, 0
 
-# 写入当前数量
 def write_current_count(w_count, b_count):
     with open(last_count_file, 'w') as f:
         f.write(f"{w_count}\n{b_count}\n")
 
-# 当前数量
 current_w = len(cleaned_whitelist)
 current_b = len(cleaned_blocklist)
-
-# 上次数量
 last_w, last_b = read_last_count()
 diff_w = current_w - last_w
 diff_b = current_b - last_b
