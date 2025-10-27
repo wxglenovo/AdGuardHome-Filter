@@ -35,5 +35,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add cleaned_whitelist.txt cleaned_blocklist.txt last_count.txt
-          git commit -m "Update AdGuardHome rules" || echo "No changes to commit"
+          git commit -m "🔁 自动更新规则文件" || echo "No changes to commit"
           git push
