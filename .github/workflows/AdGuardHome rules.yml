@@ -31,11 +31,11 @@ jobs:
             echo "" >> tmp/all_raw.txt
           done
           echo "✅ 下载完成，开始合并文件..."
-          
+
           # 清理注释和空行
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
-          
+
           # 去重并生成前 20 项重复规则日志
           echo "📊 去重并生成前 20 项重复规则日志..."
           awk '
@@ -60,36 +60,57 @@ jobs:
               }
           }
           ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
-          
+
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-          
+
           # 黑白名单冲突处理
           echo "⚔️ 处理黑白名单冲突..."
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
-          cp tmp/conflict_core.txt tmp/conflict_rules.txt
+
+          # 生成每个域名冲突抵消规则，并显示行号
+          awk '
+          NR==FNR {conflict[$0]; next} 
+          FILENAME==ARGV[2] && $0 in conflict {
+              split($0,a,"@@||"); domain=a[2]; white[domain]=FNR "行: " $0; domains[domain]=domain
+          }
+          FILENAME==ARGV[3] && $0 in conflict {
+              split($0,a,"||"); domain=a[2]; black[domain]=FNR "行: " $0; domains[domain]=domain
+          }
+          END {
+              for(d in domains){
+                  print "===== " d "抵消规则 ====="
+                  line=""
+                  if(d in white) line=line white[d]
+                  if(d in black) line=line " " black[d]
+                  print line "\n"
+              }
+          }
+          ' tmp/conflict_core.txt tmp/whitelist_tmp.txt tmp/blocklist_tmp.txt > tmp/conflict_rules.txt
+
+          # 生成最终黑白名单
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
-          
+
           # 添加头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-          
+
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
-          
+
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
-          
+
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
-          
+
           # 输出统计信息
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
@@ -98,20 +119,19 @@ jobs:
           echo "黑名单条数：$BLACKLIST_COUNT" | tee -a dist/old_rules.txt
           echo "冲突抵消数量：$CONFLICT_COUNT" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
-          
-          # 输出前 20 项重复规则和黑白名单冲突规则
-          echo "📝 前 20 项重复规则及出现行号和内容（方便调试）："
+
+          echo "📝 前 20 项重复规则及出现行号和内容："
           cat tmp/duplicate_rules.txt
-          
-          echo "📝 黑白名单冲突抵消规则内容（全部输出，方便检查）："
+
+          echo "📝 黑白名单冲突抵消规则内容（显示白名单和黑名单及行号）："
           cat tmp/conflict_rules.txt
-          
+
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
-          
+
           echo "前 20 行黑名单示例："
           head -n 20 dist/blocklist.txt
-          
+
           echo "============================================================"
 
       - name: Commit Changes
@@ -120,10 +140,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
-          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
 
@@ -167,7 +183,7 @@ jobs:
           echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
           echo "📝 前 20 项重复规则及出现行号和内容："
           cat tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则内容："
+          echo "📝 黑白名单冲突抵消规则内容（显示白名单和黑名单及行号）："
           cat tmp/conflict_rules.txt
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
