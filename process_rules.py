@@ -25,7 +25,7 @@ def fetch_file(url):
         exit(1)
 
 # ===============================
-# ⚙️ 规则清理函数（严格匹配父域后缀，包括 $ 参数）
+# ⚙️ 规则清理函数（严格父子域匹配）
 # ===============================
 def process_rules(rules, list_name="规则"):
     seen = {}  # key: (prefix, base_domain, suffix) -> 父域规则
@@ -42,15 +42,28 @@ def process_rules(rules, list_name="规则"):
         m = re.match(r'(@@?\|\|)([^/^\$]+)(.*)', line)
         if m:
             prefix, domain, suffix = m.groups()
-            base = '.'.join(domain.split('.')[-2:])  # 提取主域
+            domain_parts = domain.split('.')
+            base = '.'.join(domain_parts[-2:])  # 提取主域
             key = (prefix, base, suffix)
 
-            if key not in seen:
+            # 检查是否存在父域规则
+            deleted = False
+            for seen_key, seen_rule in seen.items():
+                seen_prefix, seen_base, seen_suffix = seen_key
+                seen_parts = seen_base.split('.')
+                # 父域必须比当前域少层级，后缀完全一致
+                if (prefix == seen_prefix and
+                    suffix == seen_suffix and
+                    len(seen_parts) < len(domain_parts) and
+                    domain.endswith(seen_base)):
+                    deleted_count += 1
+                    deleted_list.append(f"{line}  ← 匹配父域规则: {seen_rule}")
+                    deleted = True
+                    break
+
+            if not deleted:
                 seen[key] = line
                 cleaned.append(line)
-            else:
-                deleted_count += 1
-                deleted_list.append(f"{line}  ← 匹配父域规则: {seen[key]}")
         else:
             cleaned.append(line)
 
@@ -94,9 +107,9 @@ def generate_header(list_type, original_count, deleted_count, current_count, dif
 # 与上次对比: {diff_str}
 # --------------------------------------------------------
 # 🧩 说明:
-#   ▸ 父子域匹配必须后缀完全一致（包括 $ 参数），才删除子域。
-#   ▸ 多级子域（三级、四级）则保留级数更低的域名（父域）。
-#   ▸ 白名单/黑名单前缀独立处理。
+#   ▸ 父子域匹配严格：父域层级 < 子域层级，后缀完全一致（包括 $ 参数）
+#   ▸ 平级域不删除
+#   ▸ 白名单/黑名单前缀独立处理
 # ==========================================================
 """
     return header
