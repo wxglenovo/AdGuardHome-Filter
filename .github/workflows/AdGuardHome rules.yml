@@ -19,82 +19,128 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Fast & Safe)
+      - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
         run: |
           mkdir -p tmp dist
+          # 从仓库根目录 urls.txt 读取 URL 列表
           mapfile -t urls < ./urls.txt
-
-          echo "📥 开始下载规则..."
+          echo "📥 开始下载规则（带重试）..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL --retry 3 --fail --max-time 20 "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
-
+          echo "✅ 下载完成，开始合并文件..."
+          
+          # 清理注释和空行
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
-
-          echo "📊 去重并生成重复规则日志（大文件友好）..."
-          # 去重
-          LC_ALL=C sort tmp/all_cleaned.txt > tmp/all_sorted.txt
-          LC_ALL=C uniq -u tmp/all_sorted.txt > tmp/all_deduped.txt
-          # 重复规则日志
-          LC_ALL=C sort tmp/all_cleaned.txt | uniq -d > tmp/duplicate_rules.txt
-
+          
+          # 去重并生成前 20 项重复规则日志
+          echo "📊 去重并生成前 20 项重复规则日志..."
+          awk '
+          {
+              line_num=NR
+              content=$0
+              count[content]++
+              lines[content]=lines[content] ? lines[content] "\n " line_num "行: " content : " " line_num "行: " content
+              if(!seen[content]++) deduped[NR]=$0
+          }
+          END {
+              n=0
+              for(rule in count){
+                  if(count[rule]>1){
+                      print "规则: " rule "\n" lines[rule] "\n"
+                      n++
+                      if(n>=20) break
+                  }
+              }
+              for(i in deduped){
+                  print deduped[i] > "tmp/all_deduped.txt"
+              }
+          }
+          ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
+          
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-
+          
+          # 黑白名单冲突处理
           echo "⚔️ 处理黑白名单冲突..."
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
-
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
-          # 冲突规则完整输出
-          grep -Fxf tmp/conflict_core.txt tmp/all_deduped.txt > tmp/conflict_rules.txt
-
+          cp tmp/conflict_core.txt tmp/conflict_rules.txt
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
-
+          
+          # 添加头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-
+          
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
-
+          
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
-          cat tmp/whitelist.txt >> dist/whitelist.txt
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
+          
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
-          cat tmp/blocklist.txt >> dist/blocklist.txt
-
-          # 输出统计
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
+          
+          # 输出统计信息
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
-          echo "重复规则数量：$DUP_COUNT" | tee -a dist/old_rules.txt
+          echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
           echo "白名单条数：$WHITELIST_COUNT" | tee -a dist/old_rules.txt
           echo "黑名单条数：$BLACKLIST_COUNT" | tee -a dist/old_rules.txt
           echo "冲突抵消数量：$CONFLICT_COUNT" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
+          
+          # 输出前 20 项重复规则和黑白名单冲突规则
+          echo "📝 前 20 项重复规则及出现行号和内容（方便调试）："
+          cat tmp/duplicate_rules.txt
+          
+          echo "📝 黑白名单冲突抵消规则内容（全部输出，方便检查）："
+          cat tmp/conflict_rules.txt
+          
+          echo "前 20 行白名单示例："
+          head -n 20 dist/whitelist.txt
+          
+          echo "前 20 行黑名单示例："
+          head -n 20 dist/blocklist.txt
+          
+          echo "============================================================"
 
       - name: Commit Changes
         id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
+          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
+          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
+          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
+
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
+
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
+
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
+            echo "No new rules to commit"
           else
             echo "no_change=false" >> $GITHUB_OUTPUT
             git commit -m "$COMMIT_MSG"
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+            echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+            echo "✅ Commit 已完成: $COMMIT_MSG"
           fi
 
       - name: Create or Update Release
@@ -113,9 +159,15 @@ jobs:
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
-          echo "📝 重复规则日志："
+          echo "📁 白名单文件路径：dist/whitelist.txt"
+          echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
+          echo "📁 黑名单文件路径：dist/blocklist.txt"
+          echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
+          echo "重复规则数量（去重抵消）：$DUP_COUNT"
+          echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
+          echo "📝 前 20 项重复规则及出现行号和内容："
           cat tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突规则："
+          echo "📝 黑白名单冲突抵消规则内容："
           cat tmp/conflict_rules.txt
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
