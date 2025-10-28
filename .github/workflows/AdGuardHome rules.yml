@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
+      - name: Download & Merge Rules (Fast & Safe)
         run: |
           mkdir -p tmp dist
           mapfile -t urls < ./urls.txt
@@ -34,18 +34,12 @@ jobs:
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并生成重复规则日志..."
-          # 生成重复规则日志（带行号）
-          nl -w1 -s'|' tmp/all_cleaned.txt | awk -F'|' '
-          { count[$2]++; lines[$2] = lines[$2] ? lines[$2] "\n " $1 "行: " $2 : " " $1 "行: " $2 }
-          END {
-              for(rule in count){
-                  if(count[rule]>1) print "规则: " rule "\n" lines[rule] "\n"
-              }
-          }' > tmp/duplicate_rules.txt
-
-          # 去重文件
-          LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
+          echo "📊 去重并生成重复规则日志（大文件友好）..."
+          # 去重
+          LC_ALL=C sort tmp/all_cleaned.txt > tmp/all_sorted.txt
+          LC_ALL=C uniq -u tmp/all_sorted.txt > tmp/all_deduped.txt
+          # 重复规则日志
+          LC_ALL=C sort tmp/all_cleaned.txt | uniq -d > tmp/duplicate_rules.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
@@ -57,14 +51,12 @@ jobs:
 
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
-
-          # 完整冲突规则日志（保留原始 @@|| 或 ||）
+          # 冲突规则完整输出
           grep -Fxf tmp/conflict_core.txt tmp/all_deduped.txt > tmp/conflict_rules.txt
 
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
 
-          # 添加头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
@@ -74,9 +66,9 @@ jobs:
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
 
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
-          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
+          cat tmp/whitelist.txt >> dist/whitelist.txt
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
-          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
+          cat tmp/blocklist.txt >> dist/blocklist.txt
 
           # 输出统计
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
@@ -121,9 +113,9 @@ jobs:
         run: |
           echo "================= ✅ 合并完成 ================="
           cat dist/old_rules.txt
-          echo "📝 重复规则及所有出现行号和内容："
+          echo "📝 重复规则日志："
           cat tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则内容："
+          echo "📝 黑白名单冲突规则："
           cat tmp/conflict_rules.txt
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
