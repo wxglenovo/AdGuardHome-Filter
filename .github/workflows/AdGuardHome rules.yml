@@ -29,19 +29,19 @@ jobs:
           echo "📥 开始下载并合并规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            curl -sSL --retry 3 --max-time 30 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
 
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重（LC_ALL=C sort -u）..."
+          echo "📊 去重（排序 + 唯一）..."
           LC_ALL=C sort tmp/all_cleaned.txt > tmp/all_sorted.txt
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
 
           # -------------------------------
-          # 生成重复规则及原始行号日志（输出格式要求）
+          # 生成重复规则及原始行号日志（格式：规则 + 行号内容）
           # -------------------------------
           nl -w1 -s'|' tmp/all_cleaned.txt > tmp/all_numbered.txt
           awk -F'|' '
@@ -65,8 +65,8 @@ jobs:
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
 
-          sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
-          grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
+          LC_ALL=C sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
+          LC_ALL=C grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
           cp tmp/conflict_core.txt tmp/conflict_rules.txt
 
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
@@ -130,6 +130,8 @@ jobs:
           files: |
             dist/whitelist.txt
             dist/blocklist.txt
+            tmp/duplicate_rules.txt
+            tmp/conflict_rules.txt
 
       - name: Show Result
         run: |
@@ -141,10 +143,12 @@ jobs:
           echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
           echo "重复规则数量（去重抵消）：$DUP_COUNT"
           echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
-          echo "📝 重复规则及所有出现行号和内容（全部输出，方便调试）："
-          cat tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则内容（全部输出，方便检查）："
-          cat tmp/conflict_rules.txt
+          echo "📝 重复规则及所有出现行号和内容（前 300 条，防日志卡住）："
+          head -n 300 tmp/duplicate_rules.txt
+          echo "……(总重复规则 $(wc -l < tmp/duplicate_rules.txt) 条)"
+          echo "📝 黑白名单冲突抵消规则内容（前 300 条）："
+          head -n 300 tmp/conflict_rules.txt
+          echo "……(总冲突规则 $(wc -l < tmp/conflict_rules.txt) 条)"
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
           echo "前 20 行黑名单示例："
