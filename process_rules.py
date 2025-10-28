@@ -37,10 +37,10 @@ def get_base_domain(domain):
     return domain
 
 # ===============================
-# ⚙️ 规则清理函数（删除子域，区分前缀，增加日志输出）
+# ⚙️ 规则清理函数（删除子域，记录匹配父域日志）
 # ===============================
 def process_rules(rules, list_name="规则"):
-    seen = {}
+    seen = {}  # key -> 父域规则
     cleaned = []
     deleted_count = 0
     deleted_list = []
@@ -63,11 +63,12 @@ def process_rules(rules, list_name="规则"):
                 cleaned.append(line)
             else:
                 deleted_count += 1
-                deleted_list.append(line)
+                # 记录被删除的子域和对应匹配的父域
+                deleted_list.append(f"{line}  ← 匹配父域规则: {seen[key]}")
         else:
             cleaned.append(line)
 
-    # 控制台输出被删除的子域
+    # 控制台输出被删除的子域规则及其匹配父域
     if deleted_list:
         print(f"\n📝 {list_name} 被删除的子域规则 ({deleted_count} 条)：")
         for d in deleted_list:
