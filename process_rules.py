@@ -2,6 +2,7 @@ import re
 import requests
 import os
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor
 
 # ===============================
 # 🌐 白名单与黑名单地址
@@ -12,12 +13,12 @@ blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/
 last_count_file = "last_count.txt"
 
 # ===============================
-# 📥 获取远程文件并清理无用行（去除!开头）
+# 📥 下载文件（去除!或#开头）
 # ===============================
 def fetch_file(url):
     print(f"📥 正在下载: {url}")
     try:
-        r = requests.get(url)
+        r = requests.get(url, timeout=15)
         r.raise_for_status()
         lines = []
         for line in r.text.splitlines():
@@ -25,6 +26,7 @@ def fetch_file(url):
             if not line or line.startswith('!') or line.startswith('#'):
                 continue
             lines.append(line)
+        print(f"✅ 下载完成: {url} 共 {len(lines)} 行")
         return lines
     except requests.RequestException as e:
         print(f"❌ 获取文件失败: {e}")
@@ -34,11 +36,6 @@ def fetch_file(url):
 # 🧩 提取域名与后缀
 # ===============================
 def extract_domain_and_suffix(rule):
-    """
-    例：
-      @@||a.b.c.com^$domain=x.y → ('@@||', 'a.b.c.com', '^$domain=x.y')
-      ||a.b.c.com^ → ('||', 'a.b.c.com', '^')
-    """
     prefix = '@@||' if rule.startswith('@@||') else '||'
     rule_body = rule[len(prefix):]
     if '^' in rule_body:
@@ -49,7 +46,7 @@ def extract_domain_and_suffix(rule):
     return prefix, domain.strip().lower(), suffix.strip()
 
 # ===============================
-# ⚙️ 判断子域关系（含后缀完全一致）
+# ⚙️ 判断子域关系（后缀完全一致）
 # ===============================
 def is_subdomain(sub, parent):
     return sub.endswith('.' + parent)
@@ -69,15 +66,12 @@ def process_rules(rules, is_whitelist=False):
         for j, (pprefix, pdomain, psuffix) in enumerate(parsed):
             if i == j:
                 continue
-            # 同前缀（白名单或黑名单）
             if prefix != pprefix:
                 continue
-            # 后缀必须完全一致，且父域匹配
             if suffix == psuffix and is_subdomain(domain, pdomain):
                 has_parent = True
                 removed_pairs.append((f"{prefix}{domain}{suffix}", f"{pprefix}{pdomain}{psuffix}"))
                 break
-
         if not has_parent:
             cleaned.append(f"{prefix}{domain}{suffix}")
 
@@ -146,8 +140,12 @@ def save_result(filename, header, rules):
 # 🚀 主流程
 # ===============================
 def main():
-    whitelist = fetch_file(whitelist_url)
-    blocklist = fetch_file(blocklist_url)
+    # 并行下载白名单和黑名单
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_whitelist = executor.submit(fetch_file, whitelist_url)
+        future_blocklist = executor.submit(fetch_file, blocklist_url)
+        whitelist = future_whitelist.result()
+        blocklist = future_blocklist.result()
 
     cleaned_w, removed_w = process_rules(whitelist, is_whitelist=True)
     cleaned_b, removed_b = process_rules(blocklist, is_whitelist=False)
