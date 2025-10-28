@@ -26,6 +26,7 @@ jobs:
           - https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt
           - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt
           - https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +42,7 @@ jobs:
       - name: Download source
         run: |
           url_name=$(echo "${{ matrix.url }}" | sed 's/[^a-zA-Z0-9]/_/g')
+          echo "Downloading ${{ matrix.url }} -> ${url_name}.txt"
           curl -sSL "${{ matrix.url }}" -o "${url_name}.txt"
 
       - name: Clean blocklist
@@ -52,4 +54,24 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: cleaned-${{ matrix.url }}
-          path: "cleaned_*.txt"
+          path: cleaned_*.txt
+
+  merge:
+    runs-on: ubuntu-latest
+    needs: clean
+    steps:
+      - name: Download all cleaned artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./merged_sources
+
+      - name: Merge all cleaned rules
+        run: |
+          cat ./merged_sources/*.txt > blocklist_valid_merged.txt
+          echo "✅ 合并完成: blocklist_valid_merged.txt"
+
+      - name: Upload merged blocklist
+        uses: actions/upload-artifact@v3
+        with:
+          name: blocklist_valid_merged
+          path: blocklist_valid_merged.txt
