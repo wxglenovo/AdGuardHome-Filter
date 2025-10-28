@@ -22,7 +22,6 @@ jobs:
       - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
         run: |
           mkdir -p tmp dist
-          # 从仓库根目录 urls.txt 读取 URL 列表
           mapfile -t urls < ./urls.txt
           echo "📥 开始下载规则（带重试）..."
           for url in "${urls[@]}"; do
@@ -72,21 +71,32 @@ jobs:
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
 
-          # 生成每个域名冲突抵消规则，并显示行号
+          # 生成每个域名冲突抵消规则，白名单和黑名单在同一行，按字母排序
           awk '
-          NR==FNR {conflict[$0]; next} 
+          NR==FNR {conflict[$0]; next}
+
           FILENAME==ARGV[2] && $0 in conflict {
-              split($0,a,"@@||"); domain=a[2]; white[domain]=FNR "行: " $0; domains[domain]=domain
+              gsub(/^@@\|\|/, "", $0)
+              domain=$0
+              white_line[domain]=FNR "行: @@||" $0
+              domains[domain]=domain
           }
+
           FILENAME==ARGV[3] && $0 in conflict {
-              split($0,a,"||"); domain=a[2]; black[domain]=FNR "行: " $0; domains[domain]=domain
+              gsub(/^\|\|/, "", $0)
+              domain=$0
+              black_line[domain]=FNR "行: ||" $0
+              domains[domain]=domain
           }
+
           END {
-              for(d in domains){
+              n=asort(domains, sorted_domains)
+              for(i=1;i<=n;i++){
+                  d=sorted_domains[i]
                   print "===== " d "抵消规则 ====="
                   line=""
-                  if(d in white) line=line white[d]
-                  if(d in black) line=line " " black[d]
+                  if(d in white_line) line=line white_line[d]
+                  if(d in black_line) line=line " " black_line[d]
                   print line "\n"
               }
           }
@@ -123,7 +133,7 @@ jobs:
           echo "📝 前 20 项重复规则及出现行号和内容："
           cat tmp/duplicate_rules.txt
 
-          echo "📝 黑白名单冲突抵消规则内容（显示白名单和黑名单及行号）："
+          echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
           cat tmp/conflict_rules.txt
 
           echo "前 20 行白名单示例："
@@ -183,10 +193,6 @@ jobs:
           echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
           echo "📝 前 20 项重复规则及出现行号和内容："
           cat tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则内容（显示白名单和黑名单及行号）："
+          echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
           cat tmp/conflict_rules.txt
-          echo "前 20 行白名单示例："
-          head -n 20 dist/whitelist.txt
-          echo "前 20 行黑名单示例："
-          head -n 20 dist/blocklist.txt
           echo "============================================================"
