@@ -126,7 +126,7 @@ def main():
     whitelist = fetch_file(WHITELIST_URL)
     blocklist = fetch_file(BLOCKLIST_URL)
 
-    # 处理规则
+    # 处理规则（白名单 & 黑名单同逻辑）
     cleaned_whitelist, deleted_whitelist, deleted_whitelist_list = process_rules(whitelist, "白名单")
     cleaned_blocklist, deleted_blocklist, deleted_blocklist_list = process_rules(blocklist, "黑名单")
 
