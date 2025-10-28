@@ -1,0 +1,33 @@
+name: Update AdGuardHome Blocklist
+
+on:
+  schedule:
+    - cron: "0 0 * * *"  # 每天 0 点执行
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install dnspython requests
+
+      - name: Run blocklist filter
+        run: python filter_blocklist.py
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add blocklist_valid.txt
+          git diff --cached --quiet || git commit -m "Update valid blocklist"
+          git push
