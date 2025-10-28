@@ -26,13 +26,17 @@ jobs:
           mapfile -t urls < ./urls.txt
           echo "📥 开始下载规则（带重试）..."
           for url in "${urls[@]}"; do
+            echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
           echo "✅ 下载完成，开始合并文件..."
 
           # 清理注释和空行
-          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
+          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
+
+          # 删除对 AdGuard Home 无效规则
+          grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|%2Frw%2Fbeacon_|&&sub19=undefined&sub20=undefined|&EventType=DataDealImpression&|&EventType=Impression&|&action=js_stats|&ad\*&puid=\*&uid=\*=show|&ad=\*&referer=|&adb=y&adb=y\^\$popup|&adid=\$third-party|&cbiframe=\$popup|&cx=c&gtm=|&ev=PageView&|&event_name=page_view&|&event_name=view_item_list&|&fp_sid=pop\$popup,third-party|&ga_blocked=\$image|&hitType=pageview&|&l=dataLayer&cx=c|&pagegroup=\*&url=\$script|&popunder=\$popup|&popundersPerIP=\$popup|&rb=&uuid=\$third-party|&refer=http\$script|&sadbl=1&abtg=\$third-party|&sadbl=1&chu=\$third-party|&sseq=\*&dseq=\$popup,third-party|&subaffid=%\$subdocument,third-party|&t=pageview&|&xhtml?\$script,third-party|&zoneid=\*&ad_\$popup|&zoneid=\*&direct=\$popup|\*/?tzbilibili|\*/ad\.|\*/adbox/|\*/adload\.|\*/ads\.|\*/adsense/|\*/html/click/|\*/mediaController' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
 
           # 去重并生成前20项重复规则日志
           awk '
@@ -71,7 +75,7 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
 
-          # 生成黑白名单冲突日志（带行号）
+          # 生成黑白名单冲突日志（按域名显示，白名单和黑名单同一行，带行号）
           awk -F':' '
           FILENAME==ARGV[1] {
               split($0,a,":")
@@ -112,6 +116,7 @@ jobs:
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
 
+          # 输出统计到 GitHub Actions 输出
           echo "raw_count=$RAW_COUNT" >> $GITHUB_OUTPUT
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
@@ -122,18 +127,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
-          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
-          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
-          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
-
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-
-          git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
+          git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -156,16 +153,20 @@ jobs:
           files: |
             dist/whitelist.txt
             dist/blocklist.txt
+            tmp/duplicate_rules.txt
+            tmp/conflict_rules.txt
 
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
-          echo "📊 重复规则前 20 条（含行号）:"
-          cat tmp/duplicate_rules.txt
-          echo "📊 黑白名单冲突抵消规则内容（含行号，白名单和黑名单同一域名小节）:"
+          echo "原始规则总数：$RAW_COUNT"
+          echo "去重后总数：$DEDUP_COUNT"
+          echo "重复规则数量：$DUP_COUNT"
+          echo "黑白名单冲突数量：$CONFLICT_COUNT"
+          echo "📝 前20条重复规则及行号："
+          head -n 20 tmp/duplicate_rules.txt
+          echo "📝 黑白名单冲突抵消规则（按域名显示，白名单和黑名单同一行）："
           cat tmp/conflict_rules.txt
-          echo "📁 白名单文件路径：dist/whitelist.txt"
-          echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
-          echo "📁 黑名单文件路径：dist/blocklist.txt"
-          echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
+          echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
+          echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
           echo "============================================================"
