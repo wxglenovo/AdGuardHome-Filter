@@ -1,0 +1,36 @@
+name: Build and Clean AdGuardHome Rules
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # 每6小时执行一次
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          pip install requests dnspython
+
+      - name: Run rule cleaning
+        run: python main.py
+
+      - name: Commit and push results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/
+          git commit -m "🤖 Auto update: valid blocklist" || echo "No changes to commit"
+          git push
