@@ -37,7 +37,11 @@ jobs:
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           echo "📊 去重（LC_ALL=C sort -u）..."
+          LC_ALL=C sort tmp/all_cleaned.txt > tmp/all_sorted.txt
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
+
+          # 生成重复规则日志
+          comm -23 tmp/all_sorted.txt tmp/all_deduped.txt > tmp/duplicate_rules.txt
 
           # 计算重复行数
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
@@ -48,11 +52,12 @@ jobs:
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
 
-          # 找到冲突（后缀完全一致）
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
 
-          # 删除冲突
+          # 保存冲突抵消规则日志
+          cp tmp/conflict_core.txt tmp/conflict_rules.txt
+
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
 
@@ -85,10 +90,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          WHITELIST_LINES=$(wc -l < dist/whitelist.txt)
-          BLACKLIST_LINES=$(wc -l < dist/blocklist.txt)
-          TOTAL_LINES=$((WHITELIST_LINES + BLACKLIST_LINES))
 
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
@@ -129,6 +130,10 @@ jobs:
           echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
           echo "重复规则数量（去重抵消）：$DUP_COUNT"
           echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
+          echo "📝 重复规则内容（全部输出，方便调试）："
+          cat tmp/duplicate_rules.txt
+          echo "📝 黑白名单冲突抵消规则内容（全部输出，方便检查）："
+          cat tmp/conflict_rules.txt
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
           echo "前 20 行黑名单示例："
