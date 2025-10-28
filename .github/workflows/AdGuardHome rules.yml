@@ -14,131 +14,46 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
+      - name: Download & Merge Rules
         id: merge
         run: |
           mkdir -p tmp dist
           mapfile -t urls < ./urls.txt
-          echo "📥 开始下载规则（带重试）..."
+          echo "📥 开始下载规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
             curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
-          echo "✅ 下载完成，开始清理与合并..."
+          echo "✅ 下载完成，开始清理和合并..."
           # 清理注释和空行
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
 
-          # ============================================================
-          # 🧹 删除对 AdGuard Home 无效的规则
-          # ============================================================
-          echo "🧹 正在删除对 AdGuard Home 无效的规则..."
+          # 无效规则列表
           cat <<EOF > tmp/invalid_patterns.txt
-^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]
-\$ping,third-party
-%2Frw%2Fbeacon_
-&&sub19=undefined&sub20=undefined
-&EventType=DataDealImpression&
-&EventType=Impression&
-&action=js_stats
-&ad\*&puid=\*&uid=\*=show
-&ad=\*&referer=
-&adb=y&adb=y\^\$popup
-&adid=\$third-party
-&cbiframe=\$popup
-&cx=c&gtm=
-&ev=PageView&
-&event_name=page_view&
-&event_name=view_item_list&
-&fp_sid=pop\$popup,third-party
-&ga_blocked=\$image
-&hitType=pageview&
-&l=dataLayer&cx=c
-&pagegroup=\*&url=\$script
-&popunder=\$popup
-&popundersPerIP=\$popup
-&rb=&uuid=\$third-party
-&refer=http\$script
-&sadbl=1&abtg=\$third-party
-&sadbl=1&chu=\$third-party
-&sseq=\*&dseq=\$popup,third-party
-&subaffid=%\$subdocument,third-party
-&t=pageview&
-&xhtml?\$script,third-party
-&zoneid=\*&ad_\$popup
-&zoneid=\*&direct=\$popup
-\*/?tzbilibili
-\*/piaofu\.
-\*/piaofu/
-\*/redirect\?ad_cb=
-\*/svnad/\$image,script
-\*ContentAD\.
-\*H5Logic_
-\*\[STATUS\]\*
-\*adclient/
-\*adcontent/
-\*adcycle/
-\*adframe/
-\*adleft/
-\*adlink/
-\*adnum=
-\*adpolestar/
-\*adright/
-\*advflash/
-\*adview/
-\*advjs/
-\*adword/
-\*adzone/
-\*ali\*/tkapi\.
-\*attachad/
-\*clickad/
-\*codead/
-\*dashang\*
-\*diyad/
-\*duilian\*
-\*endad/
-\*flag=0&ad=
-\*flag=1&ad=
-\*flashad/
-\*floatad/
-\*flyad\.
-\*footad/
-\*gamead/
-\*get\*callback=\*cookie\*ping\*
-\*homead/
+^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|Couple)"\]
+\$\$ins\[class="adsbygoogle"\]
+\$\$p\[class="ReadAd"\]
+\$\$span\[class="dmcenterb"\]
+&xhtml\?\$script,third-party
+\*/\?tzbilibili
+\*/ad\.|\*/adbox/|\*/adload\.|\*/ads\.|\*/adsense/|\*/html/click/
+\*/mediaController
+\*hotad/|\*housead/|\*imagead/|\*imgad/|\*indexad/|\*left_ad|\*leftad/
+\*linkad/|\*openad/|\*p4pad/|\*photoad/|\*phpad/|\*picad/|\*playad/|\*popad/|\*pushad/
+\*right_ad|\*rightad/|\*show\?id=\*&static=\*_url=|\*showad/|\*sitead/|\*smsad/
+\*softad/|\*superad/|\*textad/|\*top_ad|\*topad/|\*videoclick|\*webad/|\*wwwad/
 EOF
 
+          # 删除无效规则
           grep -v -E -f tmp/invalid_patterns.txt tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt || true
 
-          # 去重并生成前20项重复规则日志
-          awk '
-          {
-              line_num=NR
-              content=$0
-              count[content]++
-              lines[content]=lines[content] ? lines[content] "\n " line_num "行: " content : " " line_num "行: " content
-              if(!seen[content]++) deduped[NR]=$0
-          }
-          END {
-              n=0
-              for(rule in count){
-                  if(count[rule]>1){
-                      print "规则: " rule "\n" lines[rule] "\n"
-                      n++
-                      if(n>=20) break
-                  }
-              }
-              for(i in deduped){
-                  print deduped[i] > "tmp/all_deduped.txt"
-              }
-          }
-          ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
-
+          # 去重
+          awk '!seen[$0]++' tmp/all_cleaned.txt > tmp/all_deduped.txt
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
@@ -152,37 +67,7 @@ EOF
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
 
-          # 生成黑白名单冲突日志
-          awk -F':' '
-          FILENAME==ARGV[1] {
-              split($0,a,":")
-              w_line=a[1]
-              w_content=a[2]
-              domain=w_content
-              sub(/^@@\|\|/,"",domain)
-              white[domain]=w_line "行: " w_content
-              next
-          }
-          FILENAME==ARGV[2] {
-              split($0,a,":")
-              b_line=a[1]
-              b_content=a[2]
-              domain=b_content
-              sub(/^\|\|/,"",domain)
-              black[domain]=b_line "行: " b_content
-          }
-          END {
-              for(d in white){
-                  if(d in black){
-                      print "===== " d " 抵消规则 ====="
-                      print "白名单: " white[d]
-                      print "黑名单: " black[d] "\n"
-                  }
-              }
-          }
-          ' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
-
-          # 添加头部信息并排序输出
+          # 生成头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
@@ -206,7 +91,7 @@ EOF
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-          git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
+          git add dist/whitelist.txt dist/blocklist.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -216,21 +101,6 @@ EOF
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create or Update Release
-        if: steps.commit.outputs.no_change == 'false'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ github.run_number }}"
-          name: "🧩 AdGuardHome Rules"
-          body: |
-            ${{ steps.commit.outputs.commit_message }}
-          files: |
-            dist/whitelist.txt
-            dist/blocklist.txt
-            tmp/duplicate_rules.txt
-            tmp/conflict_rules.txt
 
       - name: Show Result
         run: |
@@ -239,10 +109,6 @@ EOF
           echo "去重后总数：$DEDUP_COUNT"
           echo "重复规则数量：$DUP_COUNT"
           echo "黑白名单冲突数量：$CONFLICT_COUNT"
-          echo "📝 前20条重复规则及行号："
-          head -n 20 tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则（按域名显示，白名单和黑名单同一行）："
-          cat tmp/conflict_rules.txt
-          echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
-          echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
+          echo "📁 白名单行数：$(wc -l < dist/whitelist.txt)"
+          echo "📁 黑名单行数：$(wc -l < dist/blocklist.txt)"
           echo "============================================================"
