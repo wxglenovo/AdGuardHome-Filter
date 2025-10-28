@@ -1,7 +1,7 @@
 import re
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ===============================
 # 🌐 白名单与黑名单地址
@@ -20,11 +20,13 @@ def fetch_file(url):
         r.raise_for_status()
         lines = []
         for line in r.text.splitlines():
-            if not line.strip().startswith('!'):  # 去除 ! 开头的注释头部
-                lines.append(line.strip())
+            line = line.strip()
+            if not line or line.startswith('!'):
+                continue
+            lines.append(line)
         return lines
     except requests.RequestException as e:
-        print(f"获取文件失败: {e}")
+        print(f"❌ 获取文件失败: {e}")
         exit(1)
 
 # 获取白名单与黑名单规则
@@ -41,7 +43,7 @@ def get_base_domain(domain):
     return domain
 
 # ===============================
-# ⚙️ 规则清理函数（删除子域）
+# ⚙️ 规则清理函数（删除子域，区分前缀）
 # ===============================
 def process_rules(rules):
     seen = {}
@@ -59,15 +61,14 @@ def process_rules(rules):
         if m:
             prefix, domain, suffix = m.groups()
             base = get_base_domain(domain)
-            key = (base, suffix)
+            key = (prefix, base, suffix)  # ✅ 加入 prefix 区分白/黑名单类型
 
-            # 如果父域 + 相同后缀 已存在，则删除子域
+            # 判断是否是父域 + 相同后缀（例如 baidu.com 与 www.baidu.com）
             if key not in seen:
                 seen[key] = line
                 cleaned.append(line)
             else:
                 deleted_count += 1
-                continue
         else:
             cleaned.append(line)
 
@@ -101,44 +102,25 @@ diff_w = current_w - last_w
 diff_b = current_b - last_b
 
 # ===============================
-# 🧾 生成白名单/黑名单独立头部信息
+# 🧾 生成各自头部信息
 # ===============================
-def generate_whitelist_header():
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S CST')
-    diff_str = f"增加 {diff_w} 条" if diff_w > 0 else f"减少 {abs(diff_w)} 条" if diff_w < 0 else "无变化 0 条"
-    header = f"""###########################################################
-# 📅 AdGuardHome 白名单信息
-# ⏰ 更新时间: {now}
-# 🌐 来源: {whitelist_url}
-# --------------------------------------------------------
-# 📊 白名单统计:
-#   ▸ 原始规则数量: {len(whitelist)}
-#   ▸ 删除子域数量: {deleted_whitelist}
-#   ▸ 清理后规则数量: {current_w}
-#   ▸ 与上次对比: {diff_str}
-# --------------------------------------------------------
-# 🧩 说明:
-#   当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
-# ==========================================================
-"""
-    return header
+def generate_header(list_type, original_count, deleted_count, current_count, diff, url):
+    now = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')  # 北京时间
+    diff_str = f"增加 {diff} 条" if diff > 0 else f"减少 {abs(diff)} 条" if diff < 0 else "无变化 0 条"
 
-def generate_blocklist_header():
-    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S CST')
-    diff_str = f"增加 {diff_b} 条" if diff_b > 0 else f"减少 {abs(diff_b)} 条" if diff_b < 0 else "无变化 0 条"
     header = f"""###########################################################
-# 📅 AdGuardHome 黑名单信息
-# ⏰ 更新时间: {now}
-# 🌐 来源: {blocklist_url}
+# 📅 AdGuardHome {list_type} 自动构建信息
+# ⏰ 更新时间: {now} CST
+# 🌐 规则来源: {url}
 # --------------------------------------------------------
-# 📊 黑名单统计:
-#   ▸ 原始规则数量: {len(blocklist)}
-#   ▸ 删除子域数量: {deleted_blocklist}
-#   ▸ 清理后规则数量: {current_b}
-#   ▸ 与上次对比: {diff_str}
+# 原始规则数量: {original_count}
+# 删除子域数量: {deleted_count}
+# 清理后规则数量: {current_count}
+# 与上次对比: {diff_str}
 # --------------------------------------------------------
 # 🧩 说明:
-#   当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
+#   ▸ 当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
+#   ▸ 多级子域（三级、四级）则保留级数更低的域名（父域）。
 # ==========================================================
 """
     return header
@@ -146,12 +128,15 @@ def generate_blocklist_header():
 # ===============================
 # 💾 输出为两个文件
 # ===============================
+header_w = generate_header("白名单", len(whitelist), deleted_whitelist, current_w, diff_w, whitelist_url)
+header_b = generate_header("黑名单", len(blocklist), deleted_blocklist, current_b, diff_b, blocklist_url)
+
 with open("cleaned_whitelist.txt", "w", encoding="utf-8") as f:
-    f.write(generate_whitelist_header() + "\n")
+    f.write(header_w + "\n")
     f.write("\n".join(sorted(cleaned_whitelist)) + "\n")
 
 with open("cleaned_blocklist.txt", "w", encoding="utf-8") as f:
-    f.write(generate_blocklist_header() + "\n")
+    f.write(header_b + "\n")
     f.write("\n".join(sorted(cleaned_blocklist)) + "\n")
 
 # 保存最新数量
@@ -160,6 +145,7 @@ write_current_count(current_w, current_b)
 # ===============================
 # ✅ 控制台输出摘要
 # ===============================
-print(f"白名单删除子域数量: {deleted_whitelist}")
-print(f"黑名单删除子域数量: {deleted_blocklist}")
-print("✅ 已输出: cleaned_whitelist.txt 与 cleaned_blocklist.txt")
+print("✅ 白名单与黑名单处理完成")
+print(f"📊 白名单 删除子域数量: {deleted_whitelist}")
+print(f"📊 黑名单 删除子域数量: {deleted_blocklist}")
+print("📄 已输出文件: cleaned_whitelist.txt 与 cleaned_blocklist.txt")
