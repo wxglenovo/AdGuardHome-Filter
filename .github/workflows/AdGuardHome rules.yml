@@ -34,7 +34,7 @@ jobs:
           # 清理注释和空行
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          # 去重并生成前 20 项重复规则日志
+          # 去重并生成前20项重复规则日志
           awk '
           {
               line_num=NR
@@ -67,60 +67,59 @@ jobs:
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
+          grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
+          grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
 
-          # 生成黑白名单冲突抵消规则日志（带行号）
+          # 生成黑白名单冲突完整日志（真实情况）
           awk -F':' '
-          # 先处理白名单带行号
           FILENAME==ARGV[1] {
               split($0,a,":")
-              line_num=a[1]
-              content=a[2]
-              domain=content
+              w_line=a[1]
+              w_content=a[2]
+              domain=w_content
               sub(/^@@\|\|/,"",domain)
-              sub(/\^$/,"",domain)
-              white[domain]=line_num "行: " content
+              white[domain]=w_line "行: " w_content
               next
           }
-          # 再处理黑名单
           FILENAME==ARGV[2] {
               split($0,a,":")
-              line_num=a[1]
-              content=a[2]
-              domain=content
+              b_line=a[1]
+              b_content=a[2]
+              domain=b_content
               sub(/^\|\|/,"",domain)
-              sub(/\^$/,"",domain)
-              black[domain]=line_num "行: " content
+              black[domain]=b_line "行: " b_content
           }
           END {
               for(d in white){
-                  print "===== " d "抵消规则 ====="
                   w=white[d]
-                  b=(d in black) ? black[d] : "无黑名单"
-                  print "白名单: " w " 黑名单: " b "\n"
+                  b=black[d] ? black[d] : "无"
+                  print "===== " d "抵消规则 ====="
+                  print "白名单: " w
+                  print "黑名单: " b "\n"
+              }
+              for(d in black){
+                  if(!(d in white)){
+                      print "===== " d "抵消规则 ====="
+                      print "白名单: 无"
+                      print "黑名单: " black[d] "\n"
+                  }
               }
           }
           ' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
 
-          # 生成最终黑白名单
-          grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
-          grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
-
-          # 添加头部信息
+          # 添加头部信息并排序
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
-
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
-
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
 
-          # 输出统计信息
+          # 输出统计
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
@@ -129,37 +128,15 @@ jobs:
           echo "冲突抵消数量：$CONFLICT_COUNT" | tee -a dist/old_rules.txt
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
-          echo "📝 前 20 项重复规则及出现行号和内容："
-          head -n 20 tmp/duplicate_rules.txt
-
-          if [ -s tmp/conflict_rules.txt ]; then
-              echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
-              cat tmp/conflict_rules.txt
-          else
-              echo "📝 黑白名单冲突抵消规则内容为空"
-          fi
-
-          echo "前 20 行白名单示例："
-          head -n 20 dist/whitelist.txt
-
-          echo "前 20 行黑名单示例："
-          head -n 20 dist/blocklist.txt
-
-          echo "============================================================"
-
       - name: Commit Changes
         id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
-
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -169,7 +146,6 @@ jobs:
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-            echo "✅ Commit 已完成: $COMMIT_MSG"
           fi
 
       - name: Create or Update Release
@@ -183,3 +159,20 @@ jobs:
           files: |
             dist/whitelist.txt
             dist/blocklist.txt
+
+      - name: Show Result
+        run: |
+          echo "================= ✅ 合并完成 ================="
+          cat dist/old_rules.txt
+          echo "📁 白名单文件路径：dist/whitelist.txt"
+          echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
+          echo "📁 黑名单文件路径：dist/blocklist.txt"
+          echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
+          echo "重复规则数量（去重抵消）：$DUP_COUNT"
+          echo "黑白名单冲突抵消规则内容（真实情况，按域名小节，白名单和黑名单带行号）："
+          cat tmp/conflict_rules.txt
+          echo "前 20 行白名单示例："
+          head -n 20 dist/whitelist.txt
+          echo "前 20 行黑名单示例："
+          head -n 20 dist/blocklist.txt
+          echo "============================================================"
