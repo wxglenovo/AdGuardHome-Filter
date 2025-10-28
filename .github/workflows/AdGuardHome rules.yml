@@ -32,11 +32,9 @@ jobs:
           echo "✅ 下载完成，开始合并文件..."
 
           # 清理注释和空行
-          echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
           # 去重并生成前 20 项重复规则日志
-          echo "📊 去重并生成前 20 项重复规则日志..."
           awk '
           {
               line_num=NR
@@ -65,43 +63,43 @@ jobs:
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
 
           # 黑白名单冲突处理
-          echo "⚔️ 处理黑白名单冲突..."
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
 
-          # 生成每个域名冲突抵消规则，白名单和黑名单同一行，带行号
-          awk '
-          NR==FNR {conflict[$0]; next}
-
+          # 生成黑白名单冲突抵消规则日志（带行号）
+          awk -F':' '
+          # 先处理白名单带行号
+          FILENAME==ARGV[1] {
+              split($0,a,":")
+              line_num=a[1]
+              content=a[2]
+              domain=content
+              sub(/^@@\|\|/,"",domain)
+              sub(/\^$/,"",domain)
+              white[domain]=line_num "行: " content
+              next
+          }
+          # 再处理黑名单
           FILENAME==ARGV[2] {
-              domain=$0
-              sub(/^@@\|\|/, "", domain)
-              if(domain in conflict){
-                  white_line[domain]=FNR "行: " $0
-                  domains[domain]=domain
-              }
+              split($0,a,":")
+              line_num=a[1]
+              content=a[2]
+              domain=content
+              sub(/^\|\|/,"",domain)
+              sub(/\^$/,"",domain)
+              black[domain]=line_num "行: " content
           }
-
-          FILENAME==ARGV[3] {
-              domain=$0
-              sub(/^\|\|/, "", domain)
-              if(domain in conflict){
-                  black_line[domain]=FNR "行: " $0
-                  domains[domain]=domain
-              }
-          }
-
           END {
-              for(d in domains){
+              for(d in white){
                   print "===== " d "抵消规则 ====="
-                  w = (d in white_line) ? white_line[d] : "无白名单"
-                  b = (d in black_line) ? black_line[d] : "无黑名单"
+                  w=white[d]
+                  b=(d in black) ? black[d] : "无黑名单"
                   print "白名单: " w " 黑名单: " b "\n"
               }
           }
-          ' tmp/conflict_core.txt tmp/whitelist_tmp.txt tmp/blocklist_tmp.txt > tmp/conflict_rules.txt
+          ' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
 
           # 生成最终黑白名单
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
@@ -132,9 +130,8 @@ jobs:
           echo "更新时间：$TIMESTAMP" | tee -a dist/old_rules.txt
 
           echo "📝 前 20 项重复规则及出现行号和内容："
-          cat tmp/duplicate_rules.txt
+          head -n 20 tmp/duplicate_rules.txt
 
-          # 输出黑白名单冲突抵消规则内容
           if [ -s tmp/conflict_rules.txt ]; then
               echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
               cat tmp/conflict_rules.txt
