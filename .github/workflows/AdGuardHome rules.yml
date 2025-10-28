@@ -71,7 +71,7 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
 
-          # 生成黑白名单冲突日志
+          # 生成黑白名单冲突日志（带行号）
           awk -F':' '
           FILENAME==ARGV[1] {
               split($0,a,":")
@@ -112,7 +112,6 @@ jobs:
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
 
-          # 输出统计到 step output
           echo "raw_count=$RAW_COUNT" >> $GITHUB_OUTPUT
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
@@ -124,10 +123,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          NEW_ADDED=$((steps.merge.outputs.dedup_count - steps.merge.outputs.raw_count + steps.merge.outputs.conflict_count))
+          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
+          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
+          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
+          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
+
+          NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
 
-          COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${steps.merge.outputs.dedup_count} | 新增: ${NEW_ADDED} | 去重: ${steps.merge.outputs.dup_count} | 抵消: ${steps.merge.outputs.conflict_count}"
+          COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
 
           git add dist/whitelist.txt dist/blocklist.txt dist/old_rules.txt
           if git diff --cached --quiet; then
