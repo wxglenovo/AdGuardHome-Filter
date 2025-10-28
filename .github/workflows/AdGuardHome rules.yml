@@ -40,10 +40,23 @@ jobs:
           LC_ALL=C sort tmp/all_cleaned.txt > tmp/all_sorted.txt
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
 
-          # 生成重复规则日志
-          comm -23 tmp/all_sorted.txt tmp/all_deduped.txt > tmp/duplicate_rules.txt
+          # -------------------------------
+          # 生成重复规则及原始行号日志（输出格式要求）
+          # -------------------------------
+          nl -w1 -s'|' tmp/all_cleaned.txt > tmp/all_numbered.txt
+          awk -F'|' '
+          {
+              content=$2
+              line=$1
+              count[content]++
+              lines[content]=lines[content] ? lines[content] "\n " line "行: " content : " " line "行: " content
+          }
+          END {
+              for (r in count)
+                  if(count[r]>1)
+                      print "规则: " r "\n" lines[r] "\n"
+          }' tmp/all_numbered.txt > tmp/duplicate_rules.txt
 
-          # 计算重复行数
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
@@ -54,8 +67,6 @@ jobs:
 
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
-
-          # 保存冲突抵消规则日志
           cp tmp/conflict_core.txt tmp/conflict_rules.txt
 
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
@@ -130,7 +141,7 @@ jobs:
           echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
           echo "重复规则数量（去重抵消）：$DUP_COUNT"
           echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
-          echo "📝 重复规则内容（全部输出，方便调试）："
+          echo "📝 重复规则及所有出现行号和内容（全部输出，方便调试）："
           cat tmp/duplicate_rules.txt
           echo "📝 黑白名单冲突抵消规则内容（全部输出，方便检查）："
           cat tmp/conflict_rules.txt
