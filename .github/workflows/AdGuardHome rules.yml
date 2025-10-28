@@ -24,68 +24,98 @@ jobs:
         run: |
           mkdir -p tmp dist
           mapfile -t urls < ./urls.txt
-          echo "📥 开始下载规则..."
+          echo "📥 开始下载规则（带重试）..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "⚠️ Failed: $url"
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
             echo "" >> tmp/all_raw.txt
           done
-
           echo "✅ 下载完成，开始清理与合并..."
-
-          # 1️⃣ 去除注释与空行
+          # 清理注释和空行
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
 
-          # 2️⃣ 删除对 AdGuard Home 无效的规则
-          echo "🧹 删除对 AdGuard Home 无效的规则..."
-          grep -vE '\$\$div\[class="(-ad-|-ads-|-adv-|_ad_|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom)"\]|
-          \$\$div\[id="Couple"\]|
-          \$\$ins\[class="adsbygoogle"\]|
-          \$\$p\[class="ReadAd"\]|
-          \$\$span\[class="dmcenterb"\]|
-          &xhtml\?\$script,third-party|
-          \*/\?tzbilibili|
-          \*/piaofu\.|
-          \*/piaofu/|
-          \*/redirect\?ad_cb=|
-          \*/svnad/\$image,script|
-          \*ContentAD\.|
-          \*H5Logic_|
-          \*\[STATUS\]\*|
-          \*adclient/|
-          \*adcontent/|
-          \*adcycle/|
-          \*adframe/|
-          \*adleft/|
-          \*adlink/|
-          \*adnum=|
-          \*adpolestar/|
-          \*adright/|
-          \*advflash/|
-          \*adview/|
-          \*advjs/|
-          \*adword/|
-          \*adzone/|
-          \*ali\*/tkapi\.|
-          \*attachad/|
-          \*clickad/|
-          \*codead/|
-          \*dashang\*|
-          \*diyad/|
-          \*duilian\*|
-          \*endad/|
-          \*flag=0&ad=|
-          \*flag=1&ad=|
-          \*flashad/|
-          \*floatad/|
-          \*flyad\.|
-          \*footad/|
-          \*gamead/|
-          \*get\*callback=\*cookie\*ping\*|
-          \*homead/|
-          /[0-9]{2,4}x[0-9]{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
+          # ============================================================
+          # 🧹 删除对 AdGuard Home 无效的规则
+          # ============================================================
+          echo "🧹 正在删除对 AdGuard Home 无效的规则..."
+          cat <<EOF > tmp/invalid_patterns.txt
+^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]
+\$ping,third-party
+%2Frw%2Fbeacon_
+&&sub19=undefined&sub20=undefined
+&EventType=DataDealImpression&
+&EventType=Impression&
+&action=js_stats
+&ad\*&puid=\*&uid=\*=show
+&ad=\*&referer=
+&adb=y&adb=y\^\$popup
+&adid=\$third-party
+&cbiframe=\$popup
+&cx=c&gtm=
+&ev=PageView&
+&event_name=page_view&
+&event_name=view_item_list&
+&fp_sid=pop\$popup,third-party
+&ga_blocked=\$image
+&hitType=pageview&
+&l=dataLayer&cx=c
+&pagegroup=\*&url=\$script
+&popunder=\$popup
+&popundersPerIP=\$popup
+&rb=&uuid=\$third-party
+&refer=http\$script
+&sadbl=1&abtg=\$third-party
+&sadbl=1&chu=\$third-party
+&sseq=\*&dseq=\$popup,third-party
+&subaffid=%\$subdocument,third-party
+&t=pageview&
+&xhtml?\$script,third-party
+&zoneid=\*&ad_\$popup
+&zoneid=\*&direct=\$popup
+\*/?tzbilibili
+\*/piaofu\.
+\*/piaofu/
+\*/redirect\?ad_cb=
+\*/svnad/\$image,script
+\*ContentAD\.
+\*H5Logic_
+\*\[STATUS\]\*
+\*adclient/
+\*adcontent/
+\*adcycle/
+\*adframe/
+\*adleft/
+\*adlink/
+\*adnum=
+\*adpolestar/
+\*adright/
+\*advflash/
+\*adview/
+\*advjs/
+\*adword/
+\*adzone/
+\*ali\*/tkapi\.
+\*attachad/
+\*clickad/
+\*codead/
+\*dashang\*
+\*diyad/
+\*duilian\*
+\*endad/
+\*flag=0&ad=
+\*flag=1&ad=
+\*flashad/
+\*floatad/
+\*flyad\.
+\*footad/
+\*gamead/
+\*get\*callback=\*cookie\*ping\*
+\*homead/
+EOF
 
-          # 3️⃣ 去重并生成重复日志
+          grep -v -E -f tmp/invalid_patterns.txt tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt || true
+
+          # 去重并生成前20项重复规则日志
           awk '
           {
               line_num=NR
@@ -106,13 +136,14 @@ jobs:
               for(i in deduped){
                   print deduped[i] > "tmp/all_deduped.txt"
               }
-          }' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
+          }
+          ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
 
-          # 4️⃣ 黑白名单拆分与冲突处理
+          # 黑白名单冲突处理
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
@@ -121,7 +152,7 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
 
-          # 5️⃣ 生成冲突日志（白名单+黑名单对应行号）
+          # 生成黑白名单冲突日志
           awk -F':' '
           FILENAME==ARGV[1] {
               split($0,a,":")
@@ -148,16 +179,15 @@ jobs:
                       print "黑名单: " black[d] "\n"
                   }
               }
-          }' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
+          }
+          ' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
 
-          # 6️⃣ 输出最终文件
+          # 添加头部信息并排序输出
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
-
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
-
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
@@ -173,21 +203,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
-          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
-          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
-          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
-
-          NEW_ADDED=$(( DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT ))
+          NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-
           git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
-            echo "⚪ 无需提交新更改"
+            echo "No new rules to commit"
           else
             echo "no_change=false" >> $GITHUB_OUTPUT
             git commit -m "$COMMIT_MSG"
@@ -213,12 +235,14 @@ jobs:
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
-          echo "原始规则总数：${{ steps.merge.outputs.raw_count }}"
-          echo "去重后总数：${{ steps.merge.outputs.dedup_count }}"
-          echo "重复规则数量：${{ steps.merge.outputs.dup_count }}"
-          echo "黑白名单冲突数量：${{ steps.merge.outputs.conflict_count }}"
-          echo "📝 前20条重复规则："
+          echo "原始规则总数：$RAW_COUNT"
+          echo "去重后总数：$DEDUP_COUNT"
+          echo "重复规则数量：$DUP_COUNT"
+          echo "黑白名单冲突数量：$CONFLICT_COUNT"
+          echo "📝 前20条重复规则及行号："
           head -n 20 tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则（白名单和黑名单同域名对齐显示）："
+          echo "📝 黑白名单冲突抵消规则（按域名显示，白名单和黑名单同一行）："
           cat tmp/conflict_rules.txt
+          echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
+          echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
           echo "============================================================"
