@@ -1,101 +1,169 @@
 import re
 import requests
+import os
 from datetime import datetime, timedelta
 
-# -----------------------------
-# 配置区
-# -----------------------------
+# ===============================
+# 🌐 白名单与黑名单地址
+# ===============================
 whitelist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt'
-blacklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt'
+blocklist_url = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt'
 
-def fetch_rules(url):
-    print(f"📥 正在下载规则: {url}")
-    resp = requests.get(url)
-    resp.encoding = 'utf-8'
-    lines = resp.text.splitlines()
-    # 去掉注释行、空行、以“!”或“#”开头的头部信息
-    return [l.strip() for l in lines if l.strip() and not l.strip().startswith(('!', '#'))]
+last_count_file = "last_count.txt"
 
+# ===============================
+# 📥 获取远程文件并清理无用行（去除!开头）
+# ===============================
+def fetch_file(url):
+    print(f"📥 正在下载: {url}")
+    try:
+        r = requests.get(url)
+        r.raise_for_status()
+        lines = []
+        for line in r.text.splitlines():
+            line = line.strip()
+            if not line or line.startswith('!') or line.startswith('#'):
+                continue
+            lines.append(line)
+        return lines
+    except requests.RequestException as e:
+        print(f"❌ 获取文件失败: {e}")
+        exit(1)
+
+# ===============================
+# 🧩 提取域名与后缀
+# ===============================
 def extract_domain_and_suffix(rule):
     """
-    提取域名与后缀部分（不移除后缀）
-    返回 (域名, 后缀)
-    如 @@||a.b.c.com^$domain=x.y → ('a.b.c.com', '^$domain=x.y')
+    例：
+      @@||a.b.c.com^$domain=x.y → ('@@||', 'a.b.c.com', '^$domain=x.y')
+      ||a.b.c.com^ → ('||', 'a.b.c.com', '^')
     """
-    rule_body = rule
-    rule_body = rule_body.replace('@@||', '').replace('||', '')
+    prefix = '@@||' if rule.startswith('@@||') else '||'
+    rule_body = rule[len(prefix):]
     if '^' in rule_body:
         domain, suffix = rule_body.split('^', 1)
         suffix = '^' + suffix
     else:
         domain, suffix = rule_body, ''
-    return domain.lower().strip(), suffix.strip()
+    return prefix, domain.strip().lower(), suffix.strip()
 
+# ===============================
+# ⚙️ 判断子域关系（含后缀完全一致）
+# ===============================
 def is_subdomain(sub, parent):
-    """判断 sub 是否是 parent 的子域，例如 sub = a.b.com, parent = b.com"""
-    return sub.endswith("." + parent)
+    return sub.endswith('.' + parent)
 
-def clean_rules(rules, is_whitelist=False):
-    print(f"\n🧹 正在清理 {'白名单' if is_whitelist else '黑名单'}...")
+# ===============================
+# 🧹 清理规则函数
+# ===============================
+def process_rules(rules, is_whitelist=False):
+    prefix_flag = "@@||" if is_whitelist else "||"
     cleaned = []
-    removed = []
-
-    prefix = "@@||" if is_whitelist else "||"
+    removed_pairs = []
 
     parsed = [extract_domain_and_suffix(r) for r in rules]
 
-    for i, (domain, suffix) in enumerate(parsed):
+    for i, (prefix, domain, suffix) in enumerate(parsed):
         has_parent = False
-        for j, (pdomain, psuffix) in enumerate(parsed):
-            if i != j and is_subdomain(domain, pdomain) and suffix == psuffix:
-                # 子域与父域后缀完全相同，才算匹配
+        for j, (pprefix, pdomain, psuffix) in enumerate(parsed):
+            if i == j:
+                continue
+            # 同前缀（白名单或黑名单）
+            if prefix != pprefix:
+                continue
+            # 后缀必须完全一致，且父域匹配
+            if suffix == psuffix and is_subdomain(domain, pdomain):
                 has_parent = True
-                removed.append((rules[i], f"{prefix}{pdomain}{psuffix}"))
+                removed_pairs.append((f"{prefix}{domain}{suffix}", f"{pprefix}{pdomain}{psuffix}"))
                 break
+
         if not has_parent:
-            cleaned.append(rules[i])
+            cleaned.append(f"{prefix}{domain}{suffix}")
 
-    # 输出日志
-    if removed:
-        print("🗑 删除的匹配项（子域 -> 父域）：")
-        for child, parent in removed:
+    print(f"\n🧹 {'白名单' if is_whitelist else '黑名单'}清理完成:")
+    print(f"  原始规则: {len(rules)}")
+    print(f"  删除子域: {len(removed_pairs)}")
+    print(f"  保留规则: {len(cleaned)}")
+    if removed_pairs:
+        print("🗑 删除的匹配项（子域 → 父域）:")
+        for child, parent in removed_pairs[:50]:
             print(f"   ❌ {child} → 保留 {parent}")
-    else:
-        print("✅ 无匹配项删除。")
+        if len(removed_pairs) > 50:
+            print(f"   …… 共 {len(removed_pairs)} 条，省略显示")
 
-    print(f"✅ 原始规则: {len(rules)} | 删除子域: {len(removed)} | 清理后: {len(cleaned)}")
-    return cleaned, removed
+    return cleaned, removed_pairs
 
-def save_file(filename, rules, removed, is_whitelist):
-    tz = timedelta(hours=8)
-    now = datetime.utcnow() + tz
-    header = [
-        f"# {'白名单' if is_whitelist else '黑名单'}规则",
-        f"# 更新时间: {now.strftime('%Y-%m-%d %H:%M:%S')} CST",
-        f"# 原始规则数量: {len(rules) + len(removed)}",
-        f"# 删除子域数量: {len(removed)}",
-        f"# 清理后规则数量: {len(rules)}",
-        "# ==========================================================",
-        ""
-    ]
+# ===============================
+# 📊 读取与保存上次数量
+# ===============================
+def read_last_count():
+    if os.path.exists(last_count_file):
+        with open(last_count_file, 'r') as f:
+            lines = f.read().splitlines()
+            if len(lines) >= 2:
+                return int(lines[0]), int(lines[1])
+    return 0, 0
+
+def write_current_count(w_count, b_count):
+    with open(last_count_file, 'w') as f:
+        f.write(f"{w_count}\n{b_count}\n")
+
+# ===============================
+# 🧾 生成头部信息
+# ===============================
+def generate_header(list_type, original_count, deleted_count, current_count, diff, url):
+    now = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
+    diff_str = f"增加 {diff} 条" if diff > 0 else f"减少 {abs(diff)} 条" if diff < 0 else "无变化 0 条"
+
+    header = f"""###########################################################
+# 📅 AdGuardHome {list_type} 自动构建信息
+# ⏰ 更新时间: {now} CST
+# 🌐 来源: {url}
+# --------------------------------------------------------
+# 原始规则数量: {original_count}
+# 删除子域数量: {deleted_count}
+# 清理后规则数量: {current_count}
+# 与上次对比: {diff_str}
+# --------------------------------------------------------
+# 🧩 说明:
+# ▸ 父域与子域（后缀完全一致）时，保留父域规则，删除子域规则。
+# ▸ 多级子域（三级、四级）则保留级数更低的域名。
+# ==========================================================
+"""
+    return header
+
+# ===============================
+# 💾 输出结果
+# ===============================
+def save_result(filename, header, rules):
     with open(filename, "w", encoding="utf-8") as f:
-        f.write("\n".join(header + rules))
-    print(f"💾 已保存文件: {filename}\n")
+        f.write(header + "\n")
+        f.write("\n".join(sorted(rules)) + "\n")
+    print(f"💾 已生成文件: {filename}")
 
-# -----------------------------
-# 主流程
-# -----------------------------
+# ===============================
+# 🚀 主流程
+# ===============================
 def main():
-    whitelist = fetch_rules(whitelist_url)
-    blacklist = fetch_rules(blacklist_url)
+    whitelist = fetch_file(whitelist_url)
+    blocklist = fetch_file(blocklist_url)
 
-    cleaned_white, removed_white = clean_rules(whitelist, is_whitelist=True)
-    cleaned_black, removed_black = clean_rules(blacklist, is_whitelist=False)
+    cleaned_w, removed_w = process_rules(whitelist, is_whitelist=True)
+    cleaned_b, removed_b = process_rules(blocklist, is_whitelist=False)
 
-    save_file("cleaned_whitelist.txt", cleaned_white, removed_white, is_whitelist=True)
-    save_file("cleaned_blacklist.txt", cleaned_black, removed_black, is_whitelist=False)
+    last_w, last_b = read_last_count()
+    diff_w = len(cleaned_w) - last_w
+    diff_b = len(cleaned_b) - last_b
 
-    print("🎉 清理完成！输出文件：cleaned_whitelist.txt、cleaned_blacklist.txt")
+    header_w = generate_header("白名单", len(whitelist), len(removed_w), len(cleaned_w), diff_w, whitelist_url)
+    header_b = generate_header("黑名单", len(blocklist), len(removed_b), len(cleaned_b), diff_b, blocklist_url)
+
+    save_result("cleaned_whitelist.txt", header_w, cleaned_w)
+    save_result("cleaned_blocklist.txt", header_b, cleaned_b)
+
+    write_current_count(len(cleaned_w), len(cleaned_b))
+    print("\n✅ 所有处理完成！")
 
 if __name__ == "__main__":
     main()
