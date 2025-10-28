@@ -39,6 +39,11 @@ jobs:
           echo "📊 去重（LC_ALL=C sort -u）..."
           LC_ALL=C sort -u tmp/all_cleaned.txt > tmp/all_deduped.txt
 
+          # 计算重复行数
+          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
+          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
+          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
+
           echo "⚔️ 黑白名单冲突抵消..."
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
@@ -67,9 +72,6 @@ jobs:
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
 
           # 输出统计
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
-          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
           echo "去重后：$DEDUP_COUNT" | tee -a dist/old_rules.txt
           echo "重复行数：$DUP_COUNT" | tee -a dist/old_rules.txt
@@ -87,10 +89,6 @@ jobs:
           WHITELIST_LINES=$(wc -l < dist/whitelist.txt)
           BLACKLIST_LINES=$(wc -l < dist/blocklist.txt)
           TOTAL_LINES=$((WHITELIST_LINES + BLACKLIST_LINES))
-          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
-          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
 
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
@@ -129,7 +127,8 @@ jobs:
           echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
           echo "📁 黑名单文件路径：dist/blocklist.txt"
           echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
-          echo "冲突抵消数量：$(wc -l < tmp/conflict_core.txt)"
+          echo "重复规则数量（去重抵消）：$DUP_COUNT"
+          echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
           echo "前 20 行黑名单示例："
