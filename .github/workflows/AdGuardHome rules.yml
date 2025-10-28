@@ -24,30 +24,95 @@ jobs:
         run: |
           mkdir -p tmp dist
           mapfile -t urls < ./urls.txt
-          echo "📥 开始下载规则（带重试）..."
+          echo "📥 开始下载规则..."
           for url in "${urls[@]}"; do
             echo "Downloading $url"
-            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "⚠️ Failed: $url"
             echo "" >> tmp/all_raw.txt
           done
-          echo "✅ 下载完成，开始清理和合并..."
 
-          # 清理注释和空行
+          echo "✅ 下载完成，开始清理与合并..."
+
+          # 1️⃣ 去除注释与空行
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
 
+          # 2️⃣ 删除对 AdGuard Home 无效的规则
           echo "🧹 删除对 AdGuard Home 无效的规则..."
-          grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|Couple)"\]|\$\$ins\[class="adsbygoogle"\]|\$\$p\[class="ReadAd"\]|\$\$span\[class="dmcenterb"\]|&xhtml\?\$script,third-party|\*/\?tzbilibili|\*/ad\.|\*/adbox/|\*/adload\.|\*/ads\.|\*/adsense/|\*/html/click/|\*/mediaController|\*hotad/|\*housead/|\*imagead/|\*imgad/|\*indexad/|\*left_ad|\*leftad/|\*linkad/|\*openad/|\*p4pad/|\*photoad/|\*phpad/|\*picad/|\*playad/|\*popad/|\*pushad/|\*right_ad|\*rightad/|\*show\?id=\*&static=\*_url=|\*showad/|\*sitead/|\*smsad/|\*softad/|\*superad/|\*textad/|\*top_ad|\*topad/|\*videoclick|\*webad/|\*wwwad/|-120-600\.|-120_600_|-120x600\.|-120x600-| -120x600_|-160-600\.|-160x600\.|-160x600-| -160x600_|-1688-wp-media/ads/|-300-250\.|-300x250-| -300x250_|-300x600\.|-460x68\.|-468-100\.|-468-60\.|-468x60\.|-468x80\.|-468x90\.|-480x60\.|-486x60\.|-728x90\.|-728x90-| -728x90_|-729x91-| -90mh-gg\.|-980x60-| -988x60\.|-ad-manager/|-adobe-analytics/|-ads\.|-advertise-|-banner-ads-| -bobo_recommend_|-click-tracker\.|-inview-tracker\.|-mobile-default/static/js/app-download-|-tongji\.|-track-email-open\?| -track-inview\.|-tracking-pixel\.|-universal-analytics/|-web-advert-|/120x600|/160x600|/300x250|/336x280|/468x60|/728x90|/ad-|/ads/|/adclick|/adframe|/adiframe|/adlog|/adright|/adleft|/adtop|/adbottom|/adtrack|/adserver|/clickad|/floatad|/openad|/playad|/popad|/showad|/superad|/textad|/videoad|/webad|/bannerad|/pushad|/logad|/trackad|/statad|/reportad|/cookie-consent|/cookiebanner|/analytics|/counter|/pageview|/visitcount|/tracking|/recordhit|/pv|/uv|/impression|/metrics|/beacon|/collect|/hit|/viewcount|/statpixel|/viewtracker|/logclienterror|/universal-analytics|/googleanalytics|/trackpageview|/trackclick|/statscollector|/realmedia/ads|/addpageview|/event|/pixel|/pagehits|/adclient|/adcontent|/adcycle|/adframe|/adleft|/adlink|/adnum=|/adpolestar|/adright|/advflash|/adview|/advjs|/adword|/adzone|/attachad|/clickad|/codead|/dashang|/duilian|/endad|/flag=0&ad=|/flag=1&ad=|/flashad|/floatad|/flyad|/footad|/gamead|/get.*callback=.*cookie.*ping.*|/homead/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
+          grep -vE '\$\$div\[class="(-ad-|-ads-|-adv-|_ad_|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom)"\]|
+          \$\$div\[id="Couple"\]|
+          \$\$ins\[class="adsbygoogle"\]|
+          \$\$p\[class="ReadAd"\]|
+          \$\$span\[class="dmcenterb"\]|
+          &xhtml\?\$script,third-party|
+          \*/\?tzbilibili|
+          \*/piaofu\.|
+          \*/piaofu/|
+          \*/redirect\?ad_cb=|
+          \*/svnad/\$image,script|
+          \*ContentAD\.|
+          \*H5Logic_|
+          \*\[STATUS\]\*|
+          \*adclient/|
+          \*adcontent/|
+          \*adcycle/|
+          \*adframe/|
+          \*adleft/|
+          \*adlink/|
+          \*adnum=|
+          \*adpolestar/|
+          \*adright/|
+          \*advflash/|
+          \*adview/|
+          \*advjs/|
+          \*adword/|
+          \*adzone/|
+          \*ali\*/tkapi\.|
+          \*attachad/|
+          \*clickad/|
+          \*codead/|
+          \*dashang\*|
+          \*diyad/|
+          \*duilian\*|
+          \*endad/|
+          \*flag=0&ad=|
+          \*flag=1&ad=|
+          \*flashad/|
+          \*floatad/|
+          \*flyad\.|
+          \*footad/|
+          \*gamead/|
+          \*get\*callback=\*cookie\*ping\*|
+          \*homead/|
+          /[0-9]{2,4}x[0-9]{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
 
-          echo "✅ 无效规则清理完成。"
-
-          # 去重
-          awk '!seen[$0]++' tmp/all_cleaned.txt > tmp/all_deduped.txt
+          # 3️⃣ 去重并生成重复日志
+          awk '
+          {
+              line_num=NR
+              content=$0
+              count[content]++
+              lines[content]=lines[content] ? lines[content] "\n " line_num "行: " content : " " line_num "行: " content
+              if(!seen[content]++) deduped[NR]=$0
+          }
+          END {
+              n=0
+              for(rule in count){
+                  if(count[rule]>1){
+                      print "规则: " rule "\n" lines[rule] "\n"
+                      n++
+                      if(n>=20) break
+                  }
+              }
+              for(i in deduped){
+                  print deduped[i] > "tmp/all_deduped.txt"
+              }
+          }' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
 
-          # 黑白名单冲突处理
+          # 4️⃣ 黑白名单拆分与冲突处理
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
@@ -56,11 +121,43 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
 
+          # 5️⃣ 生成冲突日志（白名单+黑名单对应行号）
+          awk -F':' '
+          FILENAME==ARGV[1] {
+              split($0,a,":")
+              w_line=a[1]
+              w_content=a[2]
+              domain=w_content
+              sub(/^@@\|\|/,"",domain)
+              white[domain]=w_line "行: " w_content
+              next
+          }
+          FILENAME==ARGV[2] {
+              split($0,a,":")
+              b_line=a[1]
+              b_content=a[2]
+              domain=b_content
+              sub(/^\|\|/,"",domain)
+              black[domain]=b_line "行: " b_content
+          }
+          END {
+              for(d in white){
+                  if(d in black){
+                      print "===== " d " 抵消规则 ====="
+                      print "白名单: " white[d]
+                      print "黑名单: " black[d] "\n"
+                  }
+              }
+          }' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
+
+          # 6️⃣ 输出最终文件
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
           BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
+
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
+
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
@@ -76,13 +173,21 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
+
+          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
+          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
+          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
+          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
+
+          NEW_ADDED=$(( DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT ))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
+
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-          git add dist/whitelist.txt dist/blocklist.txt
+
+          git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
-            echo "No new rules to commit"
+            echo "⚪ 无需提交新更改"
           else
             echo "no_change=false" >> $GITHUB_OUTPUT
             git commit -m "$COMMIT_MSG"
@@ -91,13 +196,29 @@ jobs:
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
           fi
 
+      - name: Create or Update Release
+        if: steps.commit.outputs.no_change == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ github.run_number }}"
+          name: "🧩 AdGuardHome Rules"
+          body: |
+            ${{ steps.commit.outputs.commit_message }}
+          files: |
+            dist/whitelist.txt
+            dist/blocklist.txt
+            tmp/duplicate_rules.txt
+            tmp/conflict_rules.txt
+
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
-          echo "原始规则总数：$RAW_COUNT"
-          echo "去重后总数：$DEDUP_COUNT"
-          echo "重复规则数量：$DUP_COUNT"
-          echo "黑白名单冲突数量：$CONFLICT_COUNT"
-          echo "📁 白名单行数：$(wc -l < dist/whitelist.txt)"
-          echo "📁 黑名单行数：$(wc -l < dist/blocklist.txt)"
+          echo "原始规则总数：${{ steps.merge.outputs.raw_count }}"
+          echo "去重后总数：${{ steps.merge.outputs.dedup_count }}"
+          echo "重复规则数量：${{ steps.merge.outputs.dup_count }}"
+          echo "黑白名单冲突数量：${{ steps.merge.outputs.conflict_count }}"
+          echo "📝 前20条重复规则："
+          head -n 20 tmp/duplicate_rules.txt
+          echo "📝 黑白名单冲突抵消规则（白名单和黑名单同域名对齐显示）："
+          cat tmp/conflict_rules.txt
           echo "============================================================"
