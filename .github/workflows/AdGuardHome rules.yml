@@ -35,8 +35,11 @@ jobs:
           # 清理注释和空行
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
 
-          # 删除对 AdGuard Home 无效规则（新增规则已加入）
-          grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|%2Frw%2Fbeacon_|&&sub19=undefined&sub20=undefined|&EventType=DataDealImpression&|&EventType=Impression&|&action=js_stats|&ad\*&puid=\*&uid=\*=show|&ad=\*&referer=|&adb=y&adb=y\^\$popup|&adid=\$third-party|&cbiframe=\$popup|&cx=c&gtm=|&ev=PageView&|&event_name=page_view&|&event_name=view_item_list&|&fp_sid=pop\$popup,third-party|&ga_blocked=\$image|&hitType=pageview&|&l=dataLayer&cx=c|&pagegroup=\*&url=\$script|&popunder=\$popup|&popundersPerIP=\$popup|&rb=&uuid=\$third-party|&refer=http\$script|&sadbl=1&abtg=\$third-party|&sadbl=1&chu=\$third-party|&sseq=\*&dseq=\$popup,third-party|&subaffid=%\$subdocument,third-party|&t=pageview&|&xhtml?\$script,third-party|&zoneid=\*&ad_\$popup|&zoneid=\*&direct=\$popup|\*/?tzbilibili|\*/piaofu\.|\*/piaofu/|\*/redirect\?ad_cb=|\*/svnad/\$image,script|\*ContentAD\.|\*H5Logic_|*\[STATUS\]\*|\*adclient/|\*adcontent/|\*adcycle/|\*adframe/|\*adleft/|\*adlink/|\*adnum=|\*adpolestar/|\*adright/|\*advflash/|\*adview/|\*advjs/|\*adword/|\*adzone/|\*ali\*/tkapi\.|\*attachad/|\*clickad/|\*codead/|\*dashang\*|\*diyad/|\*duilian\*|\*endad/|\*flag=0&ad=|\*flag=1&ad=|\*flashad/|\*floatad/|\*flyad\.|\*footad/|\*gamead/|\*get\*callback=\*cookie\*ping\*|\*homead/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
+          # ============================================================
+          # 🧹 删除对 AdGuard Home 无效的规则
+          # ============================================================
+          echo "🧹 正在删除对 AdGuard Home 无效的规则..."
+          grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|%2Frw%2Fbeacon_|&&sub19=undefined&sub20=undefined|&EventType=DataDealImpression&|&EventType=Impression&|&action=js_stats|&ad\*&puid=\*&uid=\*=show|&ad=\*&referer=|&adb=y&adb=y\^\$popup|&adid=\$third-party|&cbiframe=\$popup|&cx=c&gtm=|&ev=PageView&|&event_name=page_view&|&event_name=view_item_list&|&fp_sid=pop\$popup,third-party|&ga_blocked=\$image|&hitType=pageview&|&l=dataLayer&cx=c|&pagegroup=\*&url=\$script|&popunder=\$popup|&popundersPerIP=\$popup|&rb=&uuid=\$third-party|&refer=http\$script|&sadbl=1&abtg=\$third-party|&sadbl=1&chu=\$third-party|&sseq=\*&dseq=\$popup,third-party|&subaffid=%\$subdocument,third-party|&t=pageview&|&xhtml?\$script,third-party|&zoneid=\*&ad_\$popup|&zoneid=\*&direct=\$popup|\*/?tzbilibili|\*/piaofu\.|\*/piaofu/|\*/redirect\?ad_cb=|\*/svnad/\$image,script|\*ContentAD\.|\*H5Logic_|*\[STATUS\]\*|\*adclient/|\*adcontent/|\*adcycle/|\*adframe/|\*adleft/|\*adlink/|\*adnum=|\*adpolestar/|\*adright/|\*advflash/|\*adview/|\*advjs/|\*adword/|\*adzone/|\*ali\*/tkapi\.|\*attachad/|\*clickad/|\*codead/|\*dashang\*|\*diyad/|\*duilian\*|\*endad/|\*flag=0&ad=|\*flag=1&ad=|\*flashad/|\*floatad/|\*flyad\.|\*footad/|\*gamead/|\*get\*callback=\*cookie\*ping\*|\*homead/|\*ContentAD\.|\*adclient/|/\d{2,4}x\d{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
 
           # 去重并生成前20项重复规则日志
           awk '
@@ -75,7 +78,7 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
 
-          # 生成黑白名单冲突日志（按域名显示，白名单和黑名单同一行，带行号）
+          # 生成黑白名单冲突日志（只显示白名单和黑名单都有的域名）
           awk -F':' '
           FILENAME==ARGV[1] {
               split($0,a,":")
