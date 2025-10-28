@@ -12,35 +12,23 @@ BLOCKLIST_URL = 'https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/
 LAST_COUNT_FILE = "last_count.txt"
 
 # ===============================
-# 📥 获取远程文件并清理无用行（去除 ! 开头的头部信息）
+# 📥 获取远程文件并清理无用行
 # ===============================
 def fetch_file(url):
     try:
-        response = requests.get(url)
-        response.raise_for_status()
-        lines = [
-            line.strip() for line in response.text.splitlines()
-            if line.strip() and not line.startswith('!')
-        ]
+        r = requests.get(url)
+        r.raise_for_status()
+        lines = [line.strip() for line in r.text.splitlines() if line.strip() and not line.startswith('!')]
         return lines
     except requests.RequestException as e:
         print(f"❌ 获取文件失败: {e}")
         exit(1)
 
 # ===============================
-# 🧩 提取主域函数（用于去除子域）
-# ===============================
-def get_base_domain(domain):
-    parts = domain.split('.')
-    if len(parts) >= 2:
-        return '.'.join(parts[-2:])
-    return domain
-
-# ===============================
-# ⚙️ 规则清理函数（删除子域，记录匹配父域日志）
+# ⚙️ 规则清理函数（严格匹配父域后缀，包括 $ 参数）
 # ===============================
 def process_rules(rules, list_name="规则"):
-    seen = {}  # key -> 父域规则
+    seen = {}  # key: (prefix, base_domain, suffix) -> 父域规则
     cleaned = []
     deleted_count = 0
     deleted_list = []
@@ -51,11 +39,10 @@ def process_rules(rules, list_name="规则"):
             cleaned.append(line)
             continue
 
-        # 匹配 @@|| 或 || 开头的规则
         m = re.match(r'(@@?\|\|)([^/^\$]+)(.*)', line)
         if m:
             prefix, domain, suffix = m.groups()
-            base = get_base_domain(domain)
+            base = '.'.join(domain.split('.')[-2:])  # 提取主域
             key = (prefix, base, suffix)
 
             if key not in seen:
@@ -63,12 +50,10 @@ def process_rules(rules, list_name="规则"):
                 cleaned.append(line)
             else:
                 deleted_count += 1
-                # 记录被删除的子域和对应匹配的父域
                 deleted_list.append(f"{line}  ← 匹配父域规则: {seen[key]}")
         else:
             cleaned.append(line)
 
-    # 控制台输出被删除的子域规则及其匹配父域
     if deleted_list:
         print(f"\n📝 {list_name} 被删除的子域规则 ({deleted_count} 条)：")
         for d in deleted_list:
@@ -95,7 +80,7 @@ def write_current_count(w_count, b_count):
 # 🧾 生成文件头部信息
 # ===============================
 def generate_header(list_type, original_count, deleted_count, current_count, diff, url):
-    now = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')  # 北京时间
+    now = (datetime.utcnow() + timedelta(hours=8)).strftime('%Y-%m-%d %H:%M:%S')
     diff_str = f"增加 {diff} 条" if diff > 0 else f"减少 {abs(diff)} 条" if diff < 0 else "无变化 0 条"
 
     header = f"""###########################################################
@@ -109,8 +94,9 @@ def generate_header(list_type, original_count, deleted_count, current_count, dif
 # 与上次对比: {diff_str}
 # --------------------------------------------------------
 # 🧩 说明:
-#   ▸ 当父域与子域（包括规则后缀）同时存在时，保留父域规则，删除子域规则。
+#   ▸ 父子域匹配必须后缀完全一致（包括 $ 参数），才删除子域。
 #   ▸ 多级子域（三级、四级）则保留级数更低的域名（父域）。
+#   ▸ 白名单/黑名单前缀独立处理。
 # ==========================================================
 """
     return header
