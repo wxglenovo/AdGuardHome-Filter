@@ -21,52 +21,57 @@ jobs:
 
       - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
         run: |
-          mkdir -p tmp dist tmp/dedup
+          mkdir -p tmp dist
 
-          # 从 urls.txt 读取 URL 列表
+          # 从仓库根目录 urls.txt 读取 URL 列表
           mapfile -t urls < ./urls.txt
 
-          echo "📥 开始下载规则（并发 + 超时处理）..."
-          n=0
+          echo "📥 开始下载规则（带重试）..."
           for url in "${urls[@]}"; do
-            n=$((n+1))
-            curl -sSL --retry 3 --connect-timeout 10 --max-time 30 "$url" -o tmp/file_$n.txt || echo "❌ Failed $url" &
+            echo "Downloading $url"
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            echo "" >> tmp/all_raw.txt
           done
-          wait
           echo "✅ 下载完成，开始合并文件..."
-          cat tmp/file_*.txt > tmp/all_raw.txt
 
           echo "🧹 清理注释和空行..."
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned.txt
 
-          echo "📊 去重并生成重复规则日志..."
-          nl -w1 -s'|' tmp/all_cleaned.txt > tmp/all_numbered.txt
-          awk -F'|' '
+          echo "📊 去重并生成重复规则日志（高效版）..."
+          awk '
           {
-              content=$2
-              line=$1
+              line_num=NR
+              content=$0
               count[content]++
-              lines[content]=lines[content] ? lines[content] "\n " line "行: " content : " " line "行: " content
+              lines[content]=lines[content] ? lines[content] "\n " line_num "行: " content : " " line_num "行: " content
+              if(!seen[content]++) deduped[NR]=$0
           }
           END {
-              for (r in count)
-                  if(count[r]>1)
-                      print "规则: " r "\n" lines[r] "\n"
-          }' tmp/all_numbered.txt > tmp/duplicate_rules.txt
-
-          # 快速去重
-          awk '!seen[$0]++' tmp/all_cleaned.txt > tmp/all_deduped.txt
+              # 输出重复规则及行号
+              for(rule in count){
+                  if(count[rule]>1){
+                      print "规则: " rule "\n" lines[rule] "\n"
+                  }
+              }
+              # 输出去重文件
+              for(i in deduped){
+                  print deduped[i] > "tmp/all_deduped.txt"
+              }
+          }
+          ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
 
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
 
-          echo "⚔️ 黑白名单冲突抵消..."
+          echo "⚔️ 处理黑白名单冲突..."
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
+
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
           cp tmp/conflict_core.txt tmp/conflict_rules.txt
+
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
 
@@ -80,9 +85,10 @@ jobs:
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
 
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
-          cat tmp/whitelist.txt >> dist/whitelist.txt
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
+
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
-          cat tmp/blocklist.txt >> dist/blocklist.txt
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
 
           # 输出统计
           echo "原始总数：$RAW_COUNT" | tee dist/old_rules.txt
