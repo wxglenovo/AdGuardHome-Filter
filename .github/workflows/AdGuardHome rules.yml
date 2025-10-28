@@ -70,7 +70,7 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
 
-          # 生成黑白名单冲突完整日志（真实情况）
+          # 生成黑白名单冲突日志（仅显示同时存在白名单和黑名单的抵消规则）
           awk -F':' '
           FILENAME==ARGV[1] {
               split($0,a,":")
@@ -91,16 +91,9 @@ jobs:
           }
           END {
               for(d in white){
-                  w=white[d]
-                  b=black[d] ? black[d] : "无"
-                  print "===== " d "抵消规则 ====="
-                  print "白名单: " w
-                  print "黑名单: " b "\n"
-              }
-              for(d in black){
-                  if(!(d in white)){
-                      print "===== " d "抵消规则 ====="
-                      print "白名单: 无"
+                  if(d in black){
+                      print "===== " d " 抵消规则 ====="
+                      print "白名单: " white[d]
                       print "黑名单: " black[d] "\n"
                   }
               }
@@ -169,7 +162,7 @@ jobs:
           echo "📁 黑名单文件路径：dist/blocklist.txt"
           echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
           echo "重复规则数量（去重抵消）：$DUP_COUNT"
-          echo "黑白名单冲突抵消规则内容（真实情况，按域名小节，白名单和黑名单带行号）："
+          echo "黑白名单冲突抵消规则内容（仅显示同时存在的白名单和黑名单）："
           cat tmp/conflict_rules.txt
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
