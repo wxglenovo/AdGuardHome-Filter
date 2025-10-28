@@ -13,41 +13,49 @@ def fetch_rules(url):
     resp = requests.get(url)
     resp.encoding = 'utf-8'
     lines = resp.text.splitlines()
-    # 去掉注释行和无效行
-    return [l.strip() for l in lines if l.strip() and not l.strip().startswith('!') and not l.strip().startswith('#')]
+    # 去掉注释行、空行、以“!”或“#”开头的头部信息
+    return [l.strip() for l in lines if l.strip() and not l.strip().startswith(('!', '#'))]
 
-def extract_domain(rule):
-    """提取纯域名（不包含@@||、||和^）"""
-    rule = rule.replace('@@||', '').replace('||', '')
-    rule = rule.split('^')[0].strip()
-    return rule.lower()
+def extract_domain_and_suffix(rule):
+    """
+    提取域名与后缀部分（不移除后缀）
+    返回 (域名, 后缀)
+    如 @@||a.b.c.com^$domain=x.y → ('a.b.c.com', '^$domain=x.y')
+    """
+    rule_body = rule
+    rule_body = rule_body.replace('@@||', '').replace('||', '')
+    if '^' in rule_body:
+        domain, suffix = rule_body.split('^', 1)
+        suffix = '^' + suffix
+    else:
+        domain, suffix = rule_body, ''
+    return domain.lower().strip(), suffix.strip()
 
 def is_subdomain(sub, parent):
-    """严格判断 sub 是否是 parent 的子域（即 sub = xxx.parent）"""
+    """判断 sub 是否是 parent 的子域，例如 sub = a.b.com, parent = b.com"""
     return sub.endswith("." + parent)
 
 def clean_rules(rules, is_whitelist=False):
-    print("\n🧹 正在清理规则...")
+    print(f"\n🧹 正在清理 {'白名单' if is_whitelist else '黑名单'}...")
     cleaned = []
     removed = []
-    domains = [extract_domain(r) for r in rules]
 
-    # 保留原规则符号
     prefix = "@@||" if is_whitelist else "||"
 
-    for i, r in enumerate(rules):
-        domain = domains[i]
-        # 检查是否有父域存在
+    parsed = [extract_domain_and_suffix(r) for r in rules]
+
+    for i, (domain, suffix) in enumerate(parsed):
         has_parent = False
-        for p in domains:
-            if domain != p and is_subdomain(domain, p):
+        for j, (pdomain, psuffix) in enumerate(parsed):
+            if i != j and is_subdomain(domain, pdomain) and suffix == psuffix:
+                # 子域与父域后缀完全相同，才算匹配
                 has_parent = True
-                removed.append((r, f"{prefix}{p}^"))
+                removed.append((rules[i], f"{prefix}{pdomain}{psuffix}"))
                 break
         if not has_parent:
-            cleaned.append(r)
+            cleaned.append(rules[i])
 
-    # 日志
+    # 输出日志
     if removed:
         print("🗑 删除的匹配项（子域 -> 父域）：")
         for child, parent in removed:
