@@ -25,7 +25,7 @@ def fetch_file(url):
                 lines.append(line)
         return lines
     except requests.RequestException as e:
-        print(f"获取文件失败: {e}")
+        print(f"❌ 获取文件失败: {e}")
         exit(1)
 
 # 获取白名单与黑名单规则
@@ -42,19 +42,18 @@ def get_base_domain(domain):
     return domain
 
 # ===============================
-# ⚙️ 规则清理函数（包括后缀匹配）
+# ⚙️ 规则清理函数（包括后缀匹配 + 日志输出）
 # ===============================
-def process_rules(rules, prefix):
+def process_rules(rules, prefix, list_name):
     cleaned = []
     keep_dict = {}  # 记录父域 + 后缀
-
-    # 先预解析所有规则
     parsed_rules = []
+
+    # 预解析规则
     for line in rules:
         if not line.startswith(prefix):
             continue
         body = line[len(prefix):]
-        # 拆分域名和后缀，例如：beyondthewords.co.uk^
         match = re.match(r"([^/^\$]+)([\/\^\$].*)?$", body)
         if not match:
             continue
@@ -62,31 +61,34 @@ def process_rules(rules, prefix):
         suffix = match.group(2) if match.group(2) else ""
         parsed_rules.append((line, domain, suffix))
 
-    # 对每条规则进行父域判断
     deleted_count = 0
+
+    print(f"\n🧹 正在处理 {list_name}...（共 {len(parsed_rules)} 条规则）")
+
     for line, domain, suffix in parsed_rules:
         base = get_base_domain(domain)
         key = (base, suffix)
 
-        # 判断是否存在父域
         if key not in keep_dict:
             keep_dict[key] = line
             cleaned.append(line)
         else:
-            # 存在父域时，检查当前是否子域（如 a.beyondthewords.co.uk）
+            # 检查是否为子域（如 a.example.com 属于 example.com）
             if domain.endswith(base) and domain != base:
                 deleted_count += 1
+                print(f"🗑️ 匹配删除: {line}  → 保留父域: {keep_dict[key]}")
                 continue
             else:
                 cleaned.append(line)
 
+    print(f"✅ {list_name} 清理完成：共删除 {deleted_count} 条\n")
     return cleaned, deleted_count
 
 # ===============================
 # 🧹 分别处理白名单与黑名单
 # ===============================
-cleaned_whitelist, deleted_whitelist = process_rules(whitelist, "@@||")
-cleaned_blocklist, deleted_blocklist = process_rules(blocklist, "||")
+cleaned_whitelist, deleted_whitelist = process_rules(whitelist, "@@||", "白名单")
+cleaned_blocklist, deleted_blocklist = process_rules(blocklist, "||", "黑名单")
 
 # ===============================
 # 📊 读取与保存上次统计数量
