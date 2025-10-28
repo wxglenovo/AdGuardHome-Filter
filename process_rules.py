@@ -33,7 +33,7 @@ whitelist = fetch_file(whitelist_url)
 blocklist = fetch_file(blocklist_url)
 
 # ===============================
-# 🧩 提取主域函数（用于去除子域）
+# 🧩 提取主域函数
 # ===============================
 def get_base_domain(domain):
     parts = domain.split('.')
@@ -42,50 +42,51 @@ def get_base_domain(domain):
     return domain
 
 # ===============================
-# ⚙️ 规则清理函数（删除子域）
+# ⚙️ 规则清理函数（包括后缀匹配）
 # ===============================
-def process_rules(rules, allow_prefix="@@||", block_prefix="||"):
-    seen = set()
+def process_rules(rules, prefix):
     cleaned = []
-    deleted_count = 0
+    keep_dict = {}  # 记录父域 + 后缀
 
+    # 先预解析所有规则
+    parsed_rules = []
     for line in rules:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            cleaned.append(line)
+        if not line.startswith(prefix):
             continue
-
-        # 匹配白名单或黑名单规则
-        if line.startswith(allow_prefix):
-            prefix = allow_prefix
-            body = line[len(allow_prefix):]
-        elif line.startswith(block_prefix):
-            prefix = block_prefix
-            body = line[len(block_prefix):]
-        else:
-            cleaned.append(line)
+        body = line[len(prefix):]
+        # 拆分域名和后缀，例如：beyondthewords.co.uk^
+        match = re.match(r"([^/^\$]+)([\/\^\$].*)?$", body)
+        if not match:
             continue
+        domain = match.group(1)
+        suffix = match.group(2) if match.group(2) else ""
+        parsed_rules.append((line, domain, suffix))
 
-        # 提取域名部分（去掉 ^、/、$ 之后的内容）
-        domain = re.split(r'[\^/\$]', body)[0].strip()
-        if not domain:
-            cleaned.append(line)
-            continue
-
+    # 对每条规则进行父域判断
+    deleted_count = 0
+    for line, domain, suffix in parsed_rules:
         base = get_base_domain(domain)
-        if base not in seen:
-            seen.add(base)
+        key = (base, suffix)
+
+        # 判断是否存在父域
+        if key not in keep_dict:
+            keep_dict[key] = line
             cleaned.append(line)
         else:
-            deleted_count += 1
+            # 存在父域时，检查当前是否子域（如 a.beyondthewords.co.uk）
+            if domain.endswith(base) and domain != base:
+                deleted_count += 1
+                continue
+            else:
+                cleaned.append(line)
 
     return cleaned, deleted_count
 
 # ===============================
 # 🧹 分别处理白名单与黑名单
 # ===============================
-cleaned_whitelist, deleted_whitelist = process_rules(whitelist, allow_prefix="@@||", block_prefix="||")
-cleaned_blocklist, deleted_blocklist = process_rules(blocklist, allow_prefix="@@||", block_prefix="||")
+cleaned_whitelist, deleted_whitelist = process_rules(whitelist, "@@||")
+cleaned_blocklist, deleted_blocklist = process_rules(blocklist, "||")
 
 # ===============================
 # 📊 读取与保存上次统计数量
@@ -109,10 +110,9 @@ diff_w = current_w - last_w
 diff_b = current_b - last_b
 
 # ===============================
-# 🧾 生成头部信息（分开显示）
+# 🧾 生成头部信息（独立显示）
 # ===============================
 def generate_header(list_type, url, original_count, deleted_count, current_count, diff_count):
-    # 使用北京时间（UTC+8）
     beijing_time = datetime.now(timezone(timedelta(hours=8))).strftime('%Y-%m-%d %H:%M:%S')
 
     diff_str = (
@@ -132,18 +132,17 @@ def generate_header(list_type, url, original_count, deleted_count, current_count
 #   ▸ 与上次对比: {diff_str}
 # --------------------------------------------------------
 # 🧩 说明:
-#   当父域与子域（包括规则后缀）同时存在时，保留父域规则。
-#   多级子域（三级、四级）则保留级数更低的域名（父域）。
+#   当父域与子域（包括相同后缀）同时存在时，保留父域规则。
+#   例如：||beyondthewords.co.uk^ 与 ||a.beyondthewords.co.uk^ → 保留前者。
 # ==========================================================
 """
     return header
 
 header_whitelist = generate_header(
-    "白名单", whitelist_url, len(whitelist), deleted_whitelist, current_w, diff_w
+    "白名单", whitelist_url, len(whitelist), deleted_whitelist, len(cleaned_whitelist), diff_w
 )
-
 header_blocklist = generate_header(
-    "黑名单", blocklist_url, len(blocklist), deleted_blocklist, current_b, diff_b
+    "黑名单", blocklist_url, len(blocklist), deleted_blocklist, len(cleaned_blocklist), diff_b
 )
 
 # ===============================
@@ -157,12 +156,12 @@ with open("cleaned_blocklist.txt", "w", encoding="utf-8") as f:
     f.write(header_blocklist + "\n")
     f.write("\n".join(sorted(cleaned_blocklist)) + "\n")
 
-write_current_count(current_w, current_b)
+write_current_count(len(cleaned_whitelist), len(cleaned_blocklist))
 
 # ===============================
 # ✅ 控制台输出摘要
 # ===============================
 print("✅ 构建完成！")
-print(f"白名单清理后: {current_w} 条（删除 {deleted_whitelist} 条）")
-print(f"黑名单清理后: {current_b} 条（删除 {deleted_blocklist} 条）")
+print(f"白名单清理后: {len(cleaned_whitelist)} 条（删除 {deleted_whitelist} 条）")
+print(f"黑名单清理后: {len(cleaned_blocklist)} 条（删除 {deleted_blocklist} 条）")
 print("输出文件: cleaned_whitelist.txt, cleaned_blocklist.txt")
