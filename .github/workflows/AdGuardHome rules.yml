@@ -71,22 +71,26 @@ jobs:
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
 
-          # 生成每个域名冲突抵消规则，白名单和黑名单在同一行，按字母排序
+          # 生成每个域名冲突抵消规则，白名单和黑名单同一行，带行号
           awk '
           NR==FNR {conflict[$0]; next}
 
-          FILENAME==ARGV[2] && $0 in conflict {
-              gsub(/^@@\|\|/, "", $0)
+          FILENAME==ARGV[2] {
               domain=$0
-              white_line[domain]=FNR "行: @@||" $0
-              domains[domain]=domain
+              sub(/^@@\|\|/, "", domain)
+              if(domain in conflict){
+                  white_line[domain]=FNR "行: " $0
+                  domains[domain]=domain
+              }
           }
 
-          FILENAME==ARGV[3] && $0 in conflict {
-              gsub(/^\|\|/, "", $0)
+          FILENAME==ARGV[3] {
               domain=$0
-              black_line[domain]=FNR "行: ||" $0
-              domains[domain]=domain
+              sub(/^\|\|/, "", domain)
+              if(domain in conflict){
+                  black_line[domain]=FNR "行: " $0
+                  domains[domain]=domain
+              }
           }
 
           END {
@@ -95,8 +99,8 @@ jobs:
                   d=sorted_domains[i]
                   print "===== " d "抵消规则 ====="
                   line=""
-                  if(d in white_line) line=line white_line[d]
-                  if(d in black_line) line=line " " black_line[d]
+                  if(d in white_line) line=line "白名单: " white_line[d]
+                  if(d in black_line) line=line " 黑名单: " black_line[d]
                   print line "\n"
               }
           }
@@ -180,19 +184,3 @@ jobs:
           files: |
             dist/whitelist.txt
             dist/blocklist.txt
-
-      - name: Show Result
-        run: |
-          echo "================= ✅ 合并完成 ================="
-          cat dist/old_rules.txt
-          echo "📁 白名单文件路径：dist/whitelist.txt"
-          echo "📊 白名单总行数：$(wc -l < dist/whitelist.txt)"
-          echo "📁 黑名单文件路径：dist/blocklist.txt"
-          echo "📊 黑名单总行数：$(wc -l < dist/blocklist.txt)"
-          echo "重复规则数量（去重抵消）：$DUP_COUNT"
-          echo "黑白名单冲突抵消规则数量：$CONFLICT_COUNT"
-          echo "📝 前 20 项重复规则及出现行号和内容："
-          cat tmp/duplicate_rules.txt
-          echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
-          cat tmp/conflict_rules.txt
-          echo "============================================================"
