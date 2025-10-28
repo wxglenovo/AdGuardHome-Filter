@@ -3,30 +3,11 @@ name: Clean AdGuard Blocklists
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"  # 每天执行一次，可按需调整
+    - cron: "0 0 * * *"
 
 jobs:
   clean:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        url: 
-          - https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Allowlist.txt
-          - https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/AdGuard%20Home_Blacklist.txt
-          - https://gh-proxy.com/raw.githubusercontent.com/changzhaoCZ/fqnovel-adrules/refs/heads/main/fqnovel-fxxk_ads
-          - https://www.i-dont-care-about-cookies.eu/abp/
-          - https://anti-ad.net/easylist.txt
-          - https://raw.githubusercontent.com/REIJI007/Adblock-Rule-Collection/main/ADBLOCK_RULE_COLLECTION_DNS.txt
-          - https://raw.githubusercontent.com/217heidai/adblockfilters/main/rules/adblockdnslite.txt
-          - https://raw.githubusercontent.com/banbendalao/ADgk/master/ADgk.txt
-          - https://easylist-downloads.adblockplus.org/easyprivacy.txt
-          - https://easylist-downloads.adblockplus.org/easylistchina.txt
-          - https://easylist-downloads.adblockplus.org/easylist.txt
-          - https://raw.githubusercontent.com/BlueSkyXN/AdGuardHomeRules/master/skyrules.txt
-          - https://raw.githubusercontent.com/cjx82630/cjxlist/master/cjx-annoyance.txt
-          - https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock/light.txt
-          - https://raw.githubusercontent.com/wxglenovo/Shadowrocket-to-AdGuard-Home/refs/heads/main/AdGuardHome.txt
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,38 +18,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install dnspython
+        run: pip install dnspython requests
 
-      - name: Download source
-        run: |
-          url_name=$(echo "${{ matrix.url }}" | sed 's/[^a-zA-Z0-9]/_/g')
-          echo "Downloading ${{ matrix.url }} -> ${url_name}.txt"
-          curl -sSL "${{ matrix.url }}" -o "${url_name}.txt"
-
-      - name: Clean blocklist
-        run: |
-          url_name=$(echo "${{ matrix.url }}" | sed 's/[^a-zA-Z0-9]/_/g')
-          python clean_blocklist.py --input "${url_name}.txt" --output "cleaned_${url_name}.txt" --log "deleted_${url_name}.log"
-
-      - name: Upload cleaned file as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: cleaned-${{ matrix.url }}
-          path: cleaned_*.txt
-
-  merge:
-    runs-on: ubuntu-latest
-    needs: clean
-    steps:
-      - name: Download all cleaned artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: ./merged_sources
-
-      - name: Merge all cleaned rules
-        run: |
-          cat ./merged_sources/*.txt > blocklist_valid_merged.txt
-          echo "✅ 合并完成: blocklist_valid_merged.txt"
+      - name: Clean all sources
+        run: python clean_blocklist.py
 
       - name: Upload merged blocklist
         uses: actions/upload-artifact@v3
