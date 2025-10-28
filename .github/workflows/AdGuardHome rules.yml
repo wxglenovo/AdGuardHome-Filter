@@ -45,25 +45,26 @@ jobs:
 
           # 去重
           awk '!seen[$0]++' tmp/all_cleaned.txt > tmp/all_deduped.txt
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
+
+          # 统计
+          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt | tr -d ' ')
+          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt | tr -d ' ')
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
 
           # 黑白名单冲突处理
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
 
-          # 生成核心白名单用于比对
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
 
-          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
+          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt | tr -d ' ')
 
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
-          WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
-          BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
+          WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt | tr -d ' ')
+          BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt | tr -d ' ')
 
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
@@ -85,16 +86,25 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # 重新确保数字变量有效
+          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt | tr -d ' ')
+          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt | tr -d ' ')
+          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
+          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt | tr -d ' ')
+
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
+
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
 
           git add dist/whitelist.txt dist/blocklist.txt
+
           if git diff --cached --quiet; then
               echo "no_change=true" >> $GITHUB_OUTPUT
               echo "No new rules to commit"
           else
               echo "no_change=false" >> $GITHUB_OUTPUT
+              echo "Commit message: $COMMIT_MSG"
               git commit -m "$COMMIT_MSG"
               git pull --rebase origin main || true
               git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
