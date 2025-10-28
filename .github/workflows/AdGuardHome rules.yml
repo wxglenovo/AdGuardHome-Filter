@@ -94,14 +94,11 @@ jobs:
           }
 
           END {
-              n=asort(domains, sorted_domains)
-              for(i=1;i<=n;i++){
-                  d=sorted_domains[i]
+              for(d in domains){
                   print "===== " d "抵消规则 ====="
-                  line=""
-                  if(d in white_line) line=line "白名单: " white_line[d]
-                  if(d in black_line) line=line " 黑名单: " black_line[d]
-                  print line "\n"
+                  w = (d in white_line) ? white_line[d] : "无白名单"
+                  b = (d in black_line) ? black_line[d] : "无黑名单"
+                  print "白名单: " w " 黑名单: " b "\n"
               }
           }
           ' tmp/conflict_core.txt tmp/whitelist_tmp.txt tmp/blocklist_tmp.txt > tmp/conflict_rules.txt
@@ -137,8 +134,13 @@ jobs:
           echo "📝 前 20 项重复规则及出现行号和内容："
           cat tmp/duplicate_rules.txt
 
-          echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
-          cat tmp/conflict_rules.txt
+          # 输出黑白名单冲突抵消规则内容
+          if [ -s tmp/conflict_rules.txt ]; then
+              echo "📝 黑白名单冲突抵消规则内容（按域名小节，白名单和黑名单同一行显示，带行号）："
+              cat tmp/conflict_rules.txt
+          else
+              echo "📝 黑白名单冲突抵消规则内容为空"
+          fi
 
           echo "前 20 行白名单示例："
           head -n 20 dist/whitelist.txt
