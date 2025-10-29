@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2025-10-29 14:41:59 CST
+# ⏰ 更新时间: 2025-10-29 21:00:34 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 2804
+# 原始规则数量: 2805
 # 删除子域数量: 5
-# 清理后规则数量: 2799
-# 与上次对比: 无变化 0 条
+# 清理后规则数量: 2800
+# 与上次对比: 增加 1 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -2425,6 +2425,7 @@
 @@||teams.microsoft.com^$generichide
 @@||technical-service.net^$xmlhttprequest,domain=n-tv.de|rtl.de|vip.de
 @@||telemetry.stytch.com/submit$domain=play.pixels.xyz
+@@||teleportpod.com/assets/EventTracking-$script,~third-party
 @@||tenki.jp/storage/static-images/top-ad/
 @@||tennispro.eu/min/?$script,~third-party
 @@||tenpay.com/v2/res/pub/cps/main/bottom_ad.js
