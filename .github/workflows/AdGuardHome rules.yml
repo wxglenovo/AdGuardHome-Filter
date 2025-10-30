@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
@@ -114,7 +114,6 @@ jobs:
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
           echo "conflict_count=$CONFLICT_COUNT" >> $GITHUB_OUTPUT
-
       - name: Commit Changes
         id: commit
         run: |
@@ -136,10 +135,9 @@ jobs:
             echo "no_change=false" >> $GITHUB_OUTPUT
             git commit -m "$COMMIT_MSG"
             git pull --rebase origin main || true
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/wxglenovo/AdGuardHome-Filter.git
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
           fi
-
       - name: Create or Update Release
         if: steps.commit.outputs.no_change == 'false'
         uses: softprops/action-gh-release@v2
@@ -153,8 +151,6 @@ jobs:
             dist/blocklist.txt
             tmp/duplicate_rules.txt
             tmp/conflict_rules.txt
-        continue-on-error: true
-
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
