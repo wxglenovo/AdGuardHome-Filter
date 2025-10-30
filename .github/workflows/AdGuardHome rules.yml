@@ -157,8 +157,8 @@ jobs:
           files: |
             dist/whitelist.txt
             dist/blocklist.txt
-            tmp/duplicate_rules.txt
-            tmp/conflict_rules.txt
+            ${{ if success() && (filesize('tmp/duplicate_rules.txt') > 0) }}: tmp/duplicate_rules.txt
+            ${{ if success() && (filesize('tmp/conflict_rules.txt') > 0) }}: tmp/conflict_rules.txt
 
       - name: Show Result
         run: |
