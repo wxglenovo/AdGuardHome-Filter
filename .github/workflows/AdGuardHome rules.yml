@@ -139,13 +139,22 @@ jobs:
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
 
-      - name: Check file sizes
+      - name: Check file sizes and set files for release
+        id: check_files
         run: |
           echo "whitelist.txt size: $(wc -c < dist/whitelist.txt)"
           echo "blocklist.txt size: $(wc -c < dist/blocklist.txt)"
           echo "duplicate_rules.txt size: $(wc -c < tmp/duplicate_rules.txt)"
           echo "conflict_rules.txt size: $(wc -c < tmp/conflict_rules.txt)"
-        
+          
+          # Prepare list of files to upload
+          files=""
+          [[ $(wc -c < dist/whitelist.txt) -gt 0 ]] && files="${files}dist/whitelist.txt "
+          [[ $(wc -c < dist/blocklist.txt) -gt 0 ]] && files="${files}dist/blocklist.txt "
+          [[ $(wc -c < tmp/duplicate_rules.txt) -gt 0 ]] && files="${files}tmp/duplicate_rules.txt "
+          [[ $(wc -c < tmp/conflict_rules.txt) -gt 0 ]] && files="${files}tmp/conflict_rules.txt"
+          echo "files=$files" >> $GITHUB_ENV
+
       - name: Create or Update Release
         if: steps.commit.outputs.no_change == 'false'
         uses: softprops/action-gh-release@v2
@@ -154,32 +163,7 @@ jobs:
           name: "🧩 AdGuardHome Rules"
           body: |
             ${{ steps.commit.outputs.commit_message }}
-          files: |
-            dist/whitelist.txt
-            dist/blocklist.txt
-            tmp/duplicate_rules.txt
-            tmp/conflict_rules.txt
-          # Make sure to upload only non-empty files
-          if [[ $(wc -c < dist/whitelist.txt) -gt 0 ]]; then
-            echo "Uploading whitelist.txt"
-          else
-            echo "Skipping empty whitelist.txt"
-          fi
-          if [[ $(wc -c < dist/blocklist.txt) -gt 0 ]]; then
-            echo "Uploading blocklist.txt"
-          else
-            echo "Skipping empty blocklist.txt"
-          fi
-          if [[ $(wc -c < tmp/duplicate_rules.txt) -gt 0 ]]; then
-            echo "Uploading duplicate_rules.txt"
-          else
-            echo "Skipping empty duplicate_rules.txt"
-          fi
-          if [[ $(wc -c < tmp/conflict_rules.txt) -gt 0 ]]; then
-            echo "Uploading conflict_rules.txt"
-          else
-            echo "Skipping empty conflict_rules.txt"
-          fi
+          files: ${{ env.files }}
 
       - name: Show Result
         run: |
