@@ -121,6 +121,13 @@ jobs:
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
           echo "conflict_count=$CONFLICT_COUNT" >> $GITHUB_OUTPUT
 
+      - name: Check file sizes
+        run: |
+          echo "whitelist.txt size: $(wc -c < dist/whitelist.txt)"
+          echo "blocklist.txt size: $(wc -c < dist/blocklist.txt)"
+          echo "duplicate_rules.txt size: $(wc -c < tmp/duplicate_rules.txt)"
+          echo "conflict_rules.txt size: $(wc -c < tmp/conflict_rules.txt)"
+
       - name: Commit Changes
         id: commit
         run: |
@@ -159,10 +166,10 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
           files: |
-            dist/whitelist.txt
-            dist/blocklist.txt
-            tmp/duplicate_rules.txt
-            tmp/conflict_rules.txt
+            ${{ if ne (wc -c < dist/whitelist.txt) 0 }}dist/whitelist.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (wc -c < dist/blocklist.txt) 0 }}dist/blocklist.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (wc -c < tmp/duplicate_rules.txt) 0 }}tmp/duplicate_rules.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (wc -c < tmp/conflict_rules.txt) 0 }}tmp/conflict_rules.txt${{ else }}${{ '' }}${{ end }}
 
       - name: Show Result
         run: |
