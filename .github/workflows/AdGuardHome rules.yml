@@ -159,9 +159,8 @@ jobs:
             dist/blocklist.txt
             tmp/duplicate_rules.txt
             tmp/conflict_rules.txt
-          # Only upload non-empty files
-          condition: |
-            test -s tmp/duplicate_rules.txt && test -s tmp/conflict_rules.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Show Result
         run: |
@@ -174,4 +173,5 @@ jobs:
           head -n 20 tmp/duplicate_rules.txt
           echo "📝 黑白名单冲突抵消规则（按域名显示，白名单和黑名单同一行）："
           cat tmp/conflict_rules.txt
-          echo "
+          echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
+          echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
