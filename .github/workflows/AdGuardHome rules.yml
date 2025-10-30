@@ -120,21 +120,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
           # 从 merge step 输出获取变量
           RAW_COUNT=${{ steps.merge.outputs.raw_count }}
           DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
           DUP_COUNT=${{ steps.merge.outputs.dup_count }}
           CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
-          
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-          
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-          
           git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
-          
-          # Check if there are any changes to commit
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -144,7 +138,6 @@ jobs:
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-          fi
 
       - name: Create or Update Release
         if: steps.commit.outputs.no_change == 'false'
@@ -161,6 +154,15 @@ jobs:
             tmp/conflict_rules.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if the files are non-empty before uploading
+          for file in dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt; do
+            if [ ! -s "$file" ]; then
+              echo "Skipping $file as it is empty"
+              # Remove the empty file from the list if it's empty
+              sed -i "/$file/d" $GITHUB_ENV
+            fi
+          done
 
       - name: Show Result
         run: |
@@ -175,3 +177,4 @@ jobs:
           cat tmp/conflict_rules.txt
           echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
           echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
+          echo "============================================================"
