@@ -114,12 +114,12 @@ jobs:
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
           echo "conflict_count=$CONFLICT_COUNT" >> $GITHUB_OUTPUT
+
       - name: Commit Changes
         id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # 从 merge step 输出获取变量
           RAW_COUNT=${{ steps.merge.outputs.raw_count }}
           DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
           DUP_COUNT=${{ steps.merge.outputs.dup_count }}
@@ -138,6 +138,15 @@ jobs:
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
           fi
+
+      - name: Prepare Release Files
+        id: release_files
+        run: |
+          FILES="dist/whitelist.txt dist/blocklist.txt"
+          [ -s tmp/duplicate_rules.txt ] && FILES="$FILES tmp/duplicate_rules.txt"
+          [ -s tmp/conflict_rules.txt ] && FILES="$FILES tmp/conflict_rules.txt"
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+
       - name: Create or Update Release
         if: steps.commit.outputs.no_change == 'false'
         uses: softprops/action-gh-release@v2
@@ -146,11 +155,8 @@ jobs:
           name: "🧩 AdGuardHome Rules"
           body: |
             ${{ steps.commit.outputs.commit_message }}
-          files: |
-            dist/whitelist.txt
-            dist/blocklist.txt
-            tmp/duplicate_rules.txt
-            tmp/conflict_rules.txt
+          files: ${{ steps.release_files.outputs.files }}
+
       - name: Show Result
         run: |
           echo "================= ✅ 合并完成 ================="
