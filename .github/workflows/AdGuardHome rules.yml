@@ -36,7 +36,6 @@ jobs:
           # 删除无效规则
           echo "🧹 正在删除对 AdGuard Home 无效的规则..."
           grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|/\d{2,4}x\d{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
-
           # 去重并生成前20条重复规则日志
           awk '
           {
@@ -60,11 +59,9 @@ jobs:
               }
           }
           ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
-
           RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
           DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
           DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
-
           # 黑白名单冲突处理
           grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
@@ -73,7 +70,6 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-
           # 生成黑白名单冲突日志
           awk -F':' '
           FILENAME==ARGV[1] {
@@ -103,7 +99,6 @@ jobs:
               }
           }
           ' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
-
           # 添加头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
@@ -114,37 +109,25 @@ jobs:
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
           LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
-
           # 输出 step 变量
           echo "raw_count=$RAW_COUNT" >> $GITHUB_OUTPUT
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
           echo "conflict_count=$CONFLICT_COUNT" >> $GITHUB_OUTPUT
-
-      - name: Check file sizes
-        run: |
-          echo "whitelist.txt size: $(wc -c < dist/whitelist.txt)"
-          echo "blocklist.txt size: $(wc -c < dist/blocklist.txt)"
-          echo "duplicate_rules.txt size: $(wc -c < tmp/duplicate_rules.txt)"
-          echo "conflict_rules.txt size: $(wc -c < tmp/conflict_rules.txt)"
-
+          
       - name: Commit Changes
         id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           # 从 merge step 输出获取变量
           RAW_COUNT=${{ steps.merge.outputs.raw_count }}
           DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
           DUP_COUNT=${{ steps.merge.outputs.dup_count }}
           CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
-
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-
           git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
@@ -155,8 +138,14 @@ jobs:
             git pull --rebase origin main || true
             git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
-          fi
 
+      - name: Check file sizes
+        run: |
+          echo "whitelist.txt size: $(wc -c < dist/whitelist.txt)"
+          echo "blocklist.txt size: $(wc -c < dist/blocklist.txt)"
+          echo "duplicate_rules.txt size: $(wc -c < tmp/duplicate_rules.txt)"
+          echo "conflict_rules.txt size: $(wc -c < tmp/conflict_rules.txt)"
+        
       - name: Create or Update Release
         if: steps.commit.outputs.no_change == 'false'
         uses: softprops/action-gh-release@v2
@@ -166,10 +155,10 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
           files: |
-            ${{ if ne (wc -c < dist/whitelist.txt) 0 }}dist/whitelist.txt${{ else }}${{ '' }}${{ end }}
-            ${{ if ne (wc -c < dist/blocklist.txt) 0 }}dist/blocklist.txt${{ else }}${{ '' }}${{ end }}
-            ${{ if ne (wc -c < tmp/duplicate_rules.txt) 0 }}tmp/duplicate_rules.txt${{ else }}${{ '' }}${{ end }}
-            ${{ if ne (wc -c < tmp/conflict_rules.txt) 0 }}tmp/conflict_rules.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (filesize 'dist/whitelist.txt') 0 }}dist/whitelist.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (filesize 'dist/blocklist.txt') 0 }}dist/blocklist.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (filesize 'tmp/duplicate_rules.txt') 0 }}tmp/duplicate_rules.txt${{ else }}${{ '' }}${{ end }}
+            ${{ if ne (filesize 'tmp/conflict_rules.txt') 0 }}tmp/conflict_rules.txt${{ else }}${{ '' }}${{ end }}
 
       - name: Show Result
         run: |
