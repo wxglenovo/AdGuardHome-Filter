@@ -155,10 +155,31 @@ jobs:
           body: |
             ${{ steps.commit.outputs.commit_message }}
           files: |
-            ${{ if ne (filesize 'dist/whitelist.txt') 0 }}dist/whitelist.txt${{ else }}${{ '' }}${{ end }}
-            ${{ if ne (filesize 'dist/blocklist.txt') 0 }}dist/blocklist.txt${{ else }}${{ '' }}${{ end }}
-            ${{ if ne (filesize 'tmp/duplicate_rules.txt') 0 }}tmp/duplicate_rules.txt${{ else }}${{ '' }}${{ end }}
-            ${{ if ne (filesize 'tmp/conflict_rules.txt') 0 }}tmp/conflict_rules.txt${{ else }}${{ '' }}${{ end }}
+            dist/whitelist.txt
+            dist/blocklist.txt
+            tmp/duplicate_rules.txt
+            tmp/conflict_rules.txt
+          # Make sure to upload only non-empty files
+          if [[ $(wc -c < dist/whitelist.txt) -gt 0 ]]; then
+            echo "Uploading whitelist.txt"
+          else
+            echo "Skipping empty whitelist.txt"
+          fi
+          if [[ $(wc -c < dist/blocklist.txt) -gt 0 ]]; then
+            echo "Uploading blocklist.txt"
+          else
+            echo "Skipping empty blocklist.txt"
+          fi
+          if [[ $(wc -c < tmp/duplicate_rules.txt) -gt 0 ]]; then
+            echo "Uploading duplicate_rules.txt"
+          else
+            echo "Skipping empty duplicate_rules.txt"
+          fi
+          if [[ $(wc -c < tmp/conflict_rules.txt) -gt 0 ]]; then
+            echo "Uploading conflict_rules.txt"
+          else
+            echo "Skipping empty conflict_rules.txt"
+          fi
 
       - name: Show Result
         run: |
