@@ -70,35 +70,6 @@ jobs:
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
-          # 生成黑白名单冲突日志
-          awk -F':' '
-          FILENAME==ARGV[1] {
-              split($0,a,":")
-              w_line=a[1]
-              w_content=a[2]
-              domain=w_content
-              sub(/^@@\|\|/,"",domain)
-              white[domain]=w_line "行: " w_content
-              next
-          }
-          FILENAME==ARGV[2] {
-              split($0,a,":")
-              b_line=a[1]
-              b_content=a[2]
-              domain=b_content
-              sub(/^\|\|/,"",domain)
-              black[domain]=b_line "行: " b_content
-          }
-          END {
-              for(d in white){
-                  if(d in black){
-                      print "===== " d " 抵消规则 ====="
-                      print "白名单: " white[d]
-                      print "黑名单: " black[d] "\n"
-                  }
-              }
-          }
-          ' <(awk '{print NR ":" $0}' tmp/whitelist_tmp.txt) <(awk '{print NR ":" $0}' tmp/blocklist_tmp.txt) > tmp/conflict_rules.txt
           # 添加头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
           WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
@@ -114,6 +85,8 @@ jobs:
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
           echo "conflict_count=$CONFLICT_COUNT" >> $GITHUB_OUTPUT
+          echo "whitelist_count=$WHITELIST_COUNT" >> $GITHUB_OUTPUT
+          echo "blacklist_count=$BLACKLIST_COUNT" >> $GITHUB_OUTPUT
 
       - name: Commit Changes
         id: commit
@@ -159,6 +132,13 @@ jobs:
 
       - name: Show Result
         run: |
+          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
+          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
+          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
+          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
+          WHITELIST_COUNT=${{ steps.merge.outputs.whitelist_count }}
+          BLACKLIST_COUNT=${{ steps.merge.outputs.blacklist_count }}
+
           echo "================= ✅ 合并完成 ================="
           echo "原始规则总数：$RAW_COUNT"
           echo "去重后总数：$DEDUP_COUNT"
