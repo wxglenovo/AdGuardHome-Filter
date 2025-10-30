@@ -154,15 +154,6 @@ jobs:
             tmp/conflict_rules.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Check if the files are non-empty before uploading
-          for file in dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt; do
-            if [ ! -s "$file" ]; then
-              echo "Skipping $file as it is empty"
-              # Remove the empty file from the list if it's empty
-              sed -i "/$file/d" $GITHUB_ENV
-            fi
-          done
 
       - name: Show Result
         run: |
