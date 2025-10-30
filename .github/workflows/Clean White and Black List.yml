@@ -1,0 +1,39 @@
+name: Clean White and Black List
+
+on:
+  schedule:
+    - cron: "10 0 * * *"  # 每天 00:10 执行
+    - cron: "10 6 * * *"  # 每天 06:10 执行
+    - cron: "10 12 * * *" # 每天 12:10 执行
+    - cron: "10 18 * * *" # 每天 18:10 执行
+  workflow_dispatch:  # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run script
+        run: python process_rules.py
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add cleaned_whitelist.txt cleaned_blocklist.txt last_count.txt
+          git commit -m "🔁 自动更新规则文件" || echo "No changes to commit"
+          git push
