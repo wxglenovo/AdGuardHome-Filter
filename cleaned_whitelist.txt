@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2025-11-06 10:07:37 CST
+# ⏰ 更新时间: 2025-11-06 14:41:03 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 93
+# 原始规则数量: 43
 # 删除子域数量: 0
-# 清理后规则数量: 93
-# 与上次对比: 无变化 0 条
+# 清理后规则数量: 43
+# 与上次对比: 减少 50 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -14,96 +14,46 @@
 #   ▸ 白名单/黑名单前缀独立处理
 # ==========================================================
 
-@@||5471782.fls.doubleclick.net^
-@@||a.fsdn.com/con/js/sftheme/cmp2.js$script,domain=m.slashdot.org
-@@||ad-putting.gw.zt-express.com^
-@@||adjs.8591.com.tw^$script
 @@||adm.crowdicity.com^
-@@||adnxs.com/ast/ast.js$domain=zone.msn.com
-@@||adnxs.com/ast/static/$domain=outlook.live.com
-@@||adobe.com.ssl.d1.sc.omtrdc.net^$xmlhttprequest,domain=www.adobe.com
 @@||ads.kbmax.com^$domain=adspipe.com
-@@||ads.reddit.com^$domain=myqqjd.com
 @@||ads.vk.com^
 @@||ads.vk.com^$popup
 @@||advert.kf5.com^
-@@||akinator.mobi.cdn.ezoic.net^$domain=akinator.mobi
-@@||alllaw.112.2o7.net^
-@@||api.msn.com^
 @@||api.onedrive.com^
-@@||app.adjust.com^
 @@||app.conceptboard.com^*/SocialIcons.js$xmlhttprequest
-@@||assets.msn.cn^
-@@||assets.msn.com^
-@@||astatic.ccmbg.com^*/prebid$script,domain=linternaute.com
 @@||browser.sentry-cdn.com^$domain=acustica-audio.com|alphaxiv.org|dic.pixiv.net|doconcall.com.my|eco-clobber.co.uk|fundhero.io|marshmallow-qa.com|members.bifa.film|menshealth.com|ocado.com|podcasty.seznam.cz|roomster.com|shop.dns-net.de|spacemarket.com|timesprime.com|vivareal.com.br|womenshealthmag.com
-@@||c.mipcdn.com^$domain=77dushu.com|biqugecom.com|prpcoin.com|zhetian.org
-@@||c.mipcdn.com^$domain=prpcoin.com
-@@||capitolbroadcasting.blueconic.net^$image,script,xmlhttprequest,domain=wral.com
-@@||captcha.su.baidu.com^
 @@||cdn.bootcss.com^$domain=openload.co|oload.tv|javno.me|imagebam.com|imagevenue.com|playvid.com|4horlover.com|linkshrink.net
-@@||cdn.bootcss.com^$script,domain=59xs.com|biqudd.com|didaxiaoshuo.cc|rijutv.com|shudai.org|xhxswz.com|xsw55.com|ysxs8.com
-@@||cdn.bootcss.com^$script,domain=biqutime.com|59xs.com|biqudd.com|u33.me|xbiqugela.com|ysxs8.vip
 @@||cdn.usefathom.com/script.js$domain=sharpen-free-design-generator.netlify.app
 @@||cloud.mail.ru^$image,~third-party
 @@||clouderrorreporting.googleapis.com^$domain=waze.com
-@@||cn.bing.com^
-@@||content.canadiantire.ca/fp/tags.js$domain=customerauth.triangle.com
 @@||d.socdm.com/adsv/*/tver_splive$xmlhttprequest,domain=imasdk.googleapis.com
 @@||elife-cloud.blogspot.com^$generichide
-@@||equifaxps.122.2o7.net^
 @@||fdyn.pubwise.io^$script,domain=urbanglasgow.co.uk
-@@||files.slack.com^$image,~third-party
 @@||fundingchoicesmessages.google.com/i/$script,domain=9to5mac.com|fanatik.com.tr|globo.com|kledgeb.blogspot.com
 @@||g.doubleclick.net/gampad/ads*%20Web%20Player$domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*%2Ftver.$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*.crunchyroll.com$xmlhttprequest,domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/ads?*RakutenShowtime$xmlhttprequest,domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/live/ads?*%2Flemino_instr%$domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/live/ads?*tver.$xmlhttprequest,domain=imasdk.googleapis.com
-@@||g.doubleclick.net/pagead/ads?*&description_url=https%3A%2F%2Fgames.wkb.jp$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g1.dfcfw.com^
 @@||gbres.dfcfw.com^
-@@||image.shutterstock.com^$image,domain=icons8.com
 @@||img-s.msn.cn^
 @@||inflight.pacwisp.net^
-@@||j4.dfcfw.com^
 @@||js.sentry-cdn.com^$script,domain=app.homebinder.com|bolt.new|book.dmm.com|etsy.com|interacty.me|jobs.ch|pizzahut.com.au
-@@||kiplinger.112.2o7.net^
-@@||lightning.bleacherreport.com^*/launch-$~third-party
 @@||login.live.com^
 @@||ltzn.9377.com^
-@@||mediav.com/js/feed_ts.js$domain=toutiao.china.com
-@@||msedge.b.tlu.dl.delivery.mp.microsoft.com^
-@@||msedgeextensions.sf.tlu.dl.delivery.mp.microsoft.com^
 @@||netatmo.commander1.com^
 @@||ntp.msn.cn^
-@@||onedrive.live.com^$generichide
-@@||optout.networkadvertising.org^$document
 @@||p.d.1emn.com^$script,domain=hotair.com
-@@||panjiachen.github.io^$generichide
-@@||prebid.adnxs.com^$xmlhttprequest,domain=go.cnn.com
 @@||promo.zendesk.com^$xmlhttprequest,domain=promo.com
 @@||pubads.g.doubleclick.net/gampad/ads?*&description_url=https%3A%2F%2Fani.gamer.com.tw$domain=imasdk.googleapis.com
-@@||puma.112.2o7.net^
-@@||raw.githubusercontent.com^$domain=viewscreen.githubusercontent.com
-@@||redirect.disqus.com^
-@@||sdk.privacy-center.org^$script,domain=20minutos.es|24sata.hr|abc.es|allocine.fr|as.com|atresplayer.com|aukro.cz|auto.it|autopista.es|beinsports.com|belfasttelegraph.co.uk|bfmtv.com|bonduelle.it|cas.sk|ciclismoafondo.es|cnews.fr|corrieredellosport.it|decathlon.pl|dnevnik.hr|dumpert.nl|dziennikwschodni.pl|dziennikzachodni.pl|ebuyclub.com|edreams.de|edreams.net|elcomercio.es|elconfidencial.com|elespanol.com|eltiempo.es|euronews.com|europe1.fr|filmweb.pl|fip.fr|flair.be|france24.com|franceculture.fr|franceinfo.fr|franceinter.fr|francetvinfo.fr|frandroid.com|funradio.fr|fyndiq.dk|fyndiq.fi|fyndiq.no|fyndiq.se|gamepro.de|gamestar.de|giphy.com|gloswielkopolski.pl|gofeminin.de|goplay.be|gva.be|hablandoenplata.es|hbvl.be|idealista.it|ivoox.com|jeanmarcmorandini.com|jeuxvideo.com|jofogas.hu|krone.at|kurier.at|ladepeche.fr|lalibre.be|lasexta.com|lasprovincias.es|lavanguardia.com|leboncoin.fr|leparisien.fr|lequipe.fr|letelegramme.fr|marca.com|marianne.net|mein-mmo.de|melty.fr|metronieuws.nl|mitula.pt|motociclismo.es|mountainbike.es|movilzona.es|mundo-geo.es|mundodeportivo.com|mundogravel.es|na.se|naszemiasto.pl|nicematin.com|nieuwsblad.be|numerama.com|ondacero.es|onmeda.de|opodo.ch|opodo.co.uk|opodo.com|opodo.com.au|opodo.de|opodo.dk|opodo.es|opodo.fi|opodo.fr|opodo.it|opodo.nl|opodo.no|opodo.pl|opodo.se|opto.sic.pt|orpi.com|otempo.pt|podcasts.leparisien.fr|profil.at|publicsenat.fr|rainberrytv.com|recup.paylib.fr|revistaoxigeno.es|rfi.fr|rmcbfmplay.com|rtbf.be|rtl.be|rtl.fr|science-et-vie.com|sensacine.com|serially.it|sfgame.net|sncf-connect.com|softonic.com|soycorredor.es|sportlife.es|standaard.be|strefabiznesu.pl|telegraaf.nl|tportal.hr|trailrun.es|triatlonweb.es|tuttosport.com|vecernji.hr|video-streaming.orange.fr|xataka.com
 @@||search.spotxchange.com/vmap/*&content_page_url=www.bsfuji.tv$xmlhttprequest,domain=imasdk.googleapis.com
 @@||sgqcvfjvr.onet.pl^
-@@||skyapi.onedrive.live.com^
-@@||sobot.com^
-@@||storage.live.com^
 @@||stream.adunity.com^$xmlhttprequest,domain=b1tv.ro
 @@||teams.live.com^$generichide
 @@||testsafebrowsing.appspot.com^
 @@||vitacost.122.2o7.net^
 @@||vodafonelimited.tt.omtrdc.net^
-@@||ware.shop.jd.com^$genericblock,generichide
 @@||web.telegram.org^$generichide
-@@||webquotepic.eastmoney.com^
 @@||widget.myrentacar.me^$script,subdocument
 @@||wikia.nocookie.net^$script,domain=fandom.com
 @@||www.bing.com^
 @@||www.eastmoney.com^
-@@||www.msn.cn^
