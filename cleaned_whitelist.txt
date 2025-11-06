@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2025-11-06 14:41:03 CST
+# ⏰ 更新时间: 2025-11-06 18:28:56 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 43
+# 原始规则数量: 48
 # 删除子域数量: 0
-# 清理后规则数量: 43
-# 与上次对比: 减少 50 条
+# 清理后规则数量: 48
+# 与上次对比: 增加 5 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -14,46 +14,51 @@
 #   ▸ 白名单/黑名单前缀独立处理
 # ==========================================================
 
+@@||a.fsdn.com/con/js/sftheme/cmp2.js$script,domain=m.slashdot.org
+@@||ad-putting.gw.zt-express.com^
 @@||adm.crowdicity.com^
-@@||ads.kbmax.com^$domain=adspipe.com
+@@||adnxs.com/ast/static/$domain=outlook.live.com
+@@||adobe.com.ssl.d1.sc.omtrdc.net^$xmlhttprequest,domain=www.adobe.com
+@@||ads.reddit.com^$domain=myqqjd.com
 @@||ads.vk.com^
-@@||ads.vk.com^$popup
 @@||advert.kf5.com^
+@@||akinator.mobi.cdn.ezoic.net^$domain=akinator.mobi
 @@||api.onedrive.com^
-@@||app.conceptboard.com^*/SocialIcons.js$xmlhttprequest
+@@||app.adjust.com^
+@@||assets.msn.cn^
 @@||browser.sentry-cdn.com^$domain=acustica-audio.com|alphaxiv.org|dic.pixiv.net|doconcall.com.my|eco-clobber.co.uk|fundhero.io|marshmallow-qa.com|members.bifa.film|menshealth.com|ocado.com|podcasty.seznam.cz|roomster.com|shop.dns-net.de|spacemarket.com|timesprime.com|vivareal.com.br|womenshealthmag.com
-@@||cdn.bootcss.com^$domain=openload.co|oload.tv|javno.me|imagebam.com|imagevenue.com|playvid.com|4horlover.com|linkshrink.net
+@@||c.mipcdn.com^$domain=77dushu.com|biqugecom.com|prpcoin.com|zhetian.org
+@@||c.mipcdn.com^$domain=prpcoin.com
+@@||capitolbroadcasting.blueconic.net^$image,script,xmlhttprequest,domain=wral.com
+@@||captcha.su.baidu.com^
+@@||cdn.bootcss.com^$script,domain=59xs.com|biqudd.com|didaxiaoshuo.cc|rijutv.com|shudai.org|xhxswz.com|xsw55.com|ysxs8.com
 @@||cdn.usefathom.com/script.js$domain=sharpen-free-design-generator.netlify.app
-@@||cloud.mail.ru^$image,~third-party
-@@||clouderrorreporting.googleapis.com^$domain=waze.com
+@@||cn.bing.com^
+@@||content.canadiantire.ca/fp/tags.js$domain=customerauth.triangle.com
 @@||d.socdm.com/adsv/*/tver_splive$xmlhttprequest,domain=imasdk.googleapis.com
-@@||elife-cloud.blogspot.com^$generichide
-@@||fdyn.pubwise.io^$script,domain=urbanglasgow.co.uk
 @@||fundingchoicesmessages.google.com/i/$script,domain=9to5mac.com|fanatik.com.tr|globo.com|kledgeb.blogspot.com
-@@||g.doubleclick.net/gampad/ads*%20Web%20Player$domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*%2Ftver.$xmlhttprequest,domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/ads?*.crunchyroll.com$xmlhttprequest,domain=imasdk.googleapis.com
-@@||g1.dfcfw.com^
-@@||gbres.dfcfw.com^
-@@||img-s.msn.cn^
+@@||g.doubleclick.net/gampad/live/ads?*%2Flemino_instr%$domain=imasdk.googleapis.com
+@@||g.doubleclick.net/pagead/ads?*&description_url=https%3A%2F%2Fgames.wkb.jp$xmlhttprequest,domain=imasdk.googleapis.com
+@@||image.shutterstock.com^$image,domain=icons8.com
 @@||inflight.pacwisp.net^
-@@||js.sentry-cdn.com^$script,domain=app.homebinder.com|bolt.new|book.dmm.com|etsy.com|interacty.me|jobs.ch|pizzahut.com.au
+@@||j4.dfcfw.com^
 @@||login.live.com^
-@@||ltzn.9377.com^
+@@||mediav.com/js/feed_ts.js$domain=toutiao.china.com
+@@||msedge.b.tlu.dl.delivery.mp.microsoft.com^
 @@||netatmo.commander1.com^
-@@||ntp.msn.cn^
+@@||onedrive.live.com^$generichide
+@@||optout.networkadvertising.org^$document
 @@||p.d.1emn.com^$script,domain=hotair.com
-@@||promo.zendesk.com^$xmlhttprequest,domain=promo.com
-@@||pubads.g.doubleclick.net/gampad/ads?*&description_url=https%3A%2F%2Fani.gamer.com.tw$domain=imasdk.googleapis.com
+@@||prebid.adnxs.com^$xmlhttprequest,domain=go.cnn.com
 @@||search.spotxchange.com/vmap/*&content_page_url=www.bsfuji.tv$xmlhttprequest,domain=imasdk.googleapis.com
 @@||sgqcvfjvr.onet.pl^
+@@||skyapi.onedrive.live.com^
 @@||stream.adunity.com^$xmlhttprequest,domain=b1tv.ro
-@@||teams.live.com^$generichide
 @@||testsafebrowsing.appspot.com^
-@@||vitacost.122.2o7.net^
 @@||vodafonelimited.tt.omtrdc.net^
+@@||ware.shop.jd.com^$genericblock,generichide
 @@||web.telegram.org^$generichide
 @@||widget.myrentacar.me^$script,subdocument
 @@||wikia.nocookie.net^$script,domain=fandom.com
-@@||www.bing.com^
-@@||www.eastmoney.com^
+@@||www.msn.cn^
