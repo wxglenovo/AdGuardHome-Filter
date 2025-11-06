@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2025-11-06 20:57:24 CST
+# ⏰ 更新时间: 2025-11-07 02:43:30 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 59
+# 原始规则数量: 72
 # 删除子域数量: 0
-# 清理后规则数量: 59
-# 与上次对比: 增加 11 条
+# 清理后规则数量: 72
+# 与上次对比: 增加 13 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -14,6 +14,7 @@
 #   ▸ 白名单/黑名单前缀独立处理
 # ==========================================================
 
+@@||5471782.fls.doubleclick.net^
 @@||a.fsdn.com/con/js/sftheme/cmp2.js$script,domain=m.slashdot.org
 @@||ad-putting.gw.zt-express.com^
 @@||adjs.8591.com.tw^$script
@@ -29,6 +30,7 @@
 @@||api.onedrive.com^
 @@||app.adjust.com^
 @@||assets.msn.cn^
+@@||assets.msn.com^
 @@||astatic.ccmbg.com^*/prebid$script,domain=linternaute.com
 @@||browser.sentry-cdn.com^$domain=acustica-audio.com|alphaxiv.org|dic.pixiv.net|doconcall.com.my|eco-clobber.co.uk|fundhero.io|marshmallow-qa.com|members.bifa.film|menshealth.com|ocado.com|podcasty.seznam.cz|roomster.com|shop.dns-net.de|spacemarket.com|timesprime.com|vivareal.com.br|womenshealthmag.com
 @@||c.mipcdn.com^$domain=77dushu.com|biqugecom.com|prpcoin.com|zhetian.org
@@ -36,21 +38,30 @@
 @@||capitolbroadcasting.blueconic.net^$image,script,xmlhttprequest,domain=wral.com
 @@||captcha.su.baidu.com^
 @@||cdn.bootcss.com^$script,domain=59xs.com|biqudd.com|didaxiaoshuo.cc|rijutv.com|shudai.org|xhxswz.com|xsw55.com|ysxs8.com
+@@||cdn.bootcss.com^$script,domain=biqutime.com|59xs.com|biqudd.com|u33.me|xbiqugela.com|ysxs8.vip
 @@||cdn.usefathom.com/script.js$domain=sharpen-free-design-generator.netlify.app
 @@||cloud.mail.ru^$image,~third-party
+@@||clouderrorreporting.googleapis.com^$domain=waze.com
 @@||cn.bing.com^
 @@||content.canadiantire.ca/fp/tags.js$domain=customerauth.triangle.com
+@@||ct.ddc.venmo.com.fpc.datadome.co^$domain=id.venmo.com
 @@||d.socdm.com/adsv/*/tver_splive$xmlhttprequest,domain=imasdk.googleapis.com
 @@||elife-cloud.blogspot.com^$generichide
+@@||fdyn.pubwise.io^$script,domain=urbanglasgow.co.uk
 @@||fundingchoicesmessages.google.com/i/$script,domain=9to5mac.com|fanatik.com.tr|globo.com|kledgeb.blogspot.com
 @@||g.doubleclick.net/gampad/ads*%20Web%20Player$domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*%2Ftver.$xmlhttprequest,domain=imasdk.googleapis.com
+@@||g.doubleclick.net/gampad/ads?*.crunchyroll.com$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/live/ads?*%2Flemino_instr%$domain=imasdk.googleapis.com
+@@||g.doubleclick.net/gampad/live/ads?*tver.$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/pagead/ads?*&description_url=https%3A%2F%2Fgames.wkb.jp$xmlhttprequest,domain=imasdk.googleapis.com
+@@||g1.dfcfw.com^
 @@||gbres.dfcfw.com^
 @@||image.shutterstock.com^$image,domain=icons8.com
+@@||img-s.msn.cn^
 @@||inflight.pacwisp.net^
 @@||j4.dfcfw.com^
+@@||kiplinger.112.2o7.net^
 @@||login.live.com^
 @@||mediav.com/js/feed_ts.js$domain=toutiao.china.com
 @@||msedge.b.tlu.dl.delivery.mp.microsoft.com^
@@ -70,6 +81,8 @@
 @@||vodafonelimited.tt.omtrdc.net^
 @@||ware.shop.jd.com^$genericblock,generichide
 @@||web.telegram.org^$generichide
+@@||webquotepic.eastmoney.com^
 @@||widget.myrentacar.me^$script,subdocument
 @@||wikia.nocookie.net^$script,domain=fandom.com
+@@||www.bing.com^
 @@||www.msn.cn^
