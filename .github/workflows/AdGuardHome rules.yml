@@ -43,11 +43,7 @@ jobs:
           grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
           # 删除无效规则，防止报错
           echo "🧹 正在删除对 AdGuard Home 无效的规则..."
-          if [ -s tmp/all_cleaned_temp.txt ]; then
-              grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|/\d{2,4}x\d{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
-          else
-              touch tmp/all_cleaned.txt
-          fi
+          grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|/\d{2,4}x\d{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt || true
           # 去重并生成前20条重复规则日志
           awk '
           {
@@ -79,7 +75,6 @@ jobs:
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
-          # ✅ 修正：生成 conflict_rules.txt
           cp tmp/conflict_core.txt tmp/conflict_rules.txt
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
