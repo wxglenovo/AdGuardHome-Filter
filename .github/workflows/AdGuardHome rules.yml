@@ -1,3 +1,5 @@
+
+
 name: Build AdGuardHome rules
 
 on:
@@ -13,7 +15,7 @@ on:
     - cron: "0 16 * * *"
     - cron: "0 18 * * *"
     - cron: "0 20 * * *"
-    - cron: "0 22 * * *"
+    - cron: "0 22 * * *"    
   workflow_dispatch:
 
 permissions:
@@ -22,146 +24,73 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare folders
+      - name: Download & Merge Rules (Clean + Deduplicate + Conflict Remove)
+        id: merge
         run: |
           mkdir -p tmp dist
-          rm -f tmp/all_raw.txt tmp/all_cleaned_temp.txt tmp/all_cleaned.txt tmp/all_deduped.txt tmp/duplicate_rules.txt tmp/whitelist_tmp.txt tmp/blocklist_tmp.txt tmp/whitelist_core.txt tmp/conflict_core.txt tmp/whitelist.txt tmp/blocklist.txt
-
-      - name: Download sources
-        id: download
-        run: |
-          set -u
+          mapfile -t urls < ./urls.txt
           echo "📥 开始下载规则（带重试）..."
-          mapfile -t urls < ./urls.txt || true
-          # ensure file exists even if urls.txt empty
-          touch tmp/all_raw.txt
           for url in "${urls[@]}"; do
-            if [ -n "$url" ]; then
-              echo "Downloading $url"
-              # append with a blank line separator
-              if ! curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt; then
-                echo "Failed $url" >&2
-                echo "" >> tmp/all_raw.txt
-              else
-                echo "" >> tmp/all_raw.txt
-              fi
-            fi
+            echo "Downloading $url"
+            curl -sSL --retry 3 --fail "$url" >> tmp/all_raw.txt || echo "Failed $url"
+            echo "" >> tmp/all_raw.txt
           done
-          echo "✅ 下载步骤完成"
-
-      - name: Clean comments & blank lines
-        run: |
-          # 移除以 # 或 ! 开头的注释行与空行，保留原样到 tmp/all_cleaned_temp.txt
-          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt || true
-          # if tmp/all_cleaned_temp.txt missing or empty, create empty file to avoid later failures
-          : > tmp/all_cleaned_temp.txt
-
-      - name: Filter valid AdGuard rules (robust awk)
-        run: |
+          echo "✅ 下载完成，开始合并文件..."
+          # 清理注释和空行
+          grep -vE '^[[:space:]]*[!#]' tmp/all_raw.txt | sed '/^[[:space:]]*$/d' > tmp/all_cleaned_temp.txt
+          # 删除无效规则
           echo "🧹 正在删除对 AdGuard Home 无效的规则..."
-          # 规则说明（保留形式）：
-          # - 普通域名: example.com
-          # - EasyList / AdGuard domain rules: ||example.com^ 或带 ^ 的域名
-          # - 正则表达式以 /.../ 的形式
-          # 此 awk 兼容空输入，不会返回非零退出码
+          grep -vE '^\$\$div\[class="(-ad-|_ad_|-ads-|ad-banner-wrapper|ad-card|ad_bottom|ad_top|bannerBottom|id="Couple")"\]|\$ping,third-party|/\d{2,4}x\d{2,4}/' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt
+          # 去重并生成前20条重复规则日志
           awk '
-            BEGIN { FS=OFS="\n" }
-            {
-              line=$0
-              # trim leading/trailing spaces
-              gsub(/^[ \t\r\n]+|[ \t\r\n]+$/, "", line)
-              if(line=="") next
-              if(line ~ /^[[:space:]]*#/ ) next
-              # allow /.../ regex rules (AdGuard/ABP style)
-              if(line ~ /^\/.*\/$/) { print line; next }
-              # allow EasyList like ||domain.com^ or ||domain.com
-              if(line ~ /^\|\|[A-Za-z0-9.-]+(\^)?$/) { print line; next }
-              # allow plain domain or subdomain or wildcard-like domain
-              if(line ~ /^[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9]$/) { print line; next }
-              # allow adguard filter syntax $... optionally (keep conservative)
-              if(line ~ /^\$.+/) { next }
-              # otherwise ignore
-            }
-          ' tmp/all_cleaned_temp.txt > tmp/all_cleaned.txt || true
-          # ensure file exists
-          touch tmp/all_cleaned.txt
-
-      - name: Deduplicate and record duplicates
-        run: |
-          echo "🔁 去重并输出前 20 条重复规则..."
-          # 使用 awk 去重并同时输出重复项日志（安全且可控）
-          awk '
-            {
-              cnt[$0]++
-              if(!( $0 in seen)) {
-                order[++n] = $0
-                seen[$0]=1
+          {
+              line_num=NR
+              content=$0
+              count[content]++
+              lines[content]=lines[content] ? lines[content] "\n " line_num "行: " content : " " line_num "行: " content
+              if(!seen[content]++) deduped[NR]=$0
+          }
+          END {
+              n=0
+              for(rule in count){
+                  if(count[rule]>1){
+                      print "规则: " rule "\n" lines[rule] "\n"
+                      n++
+                      if(n>=20) break
+                  }
               }
-            }
-            END {
-              dups=0
-              for (i in cnt) {
-                if (cnt[i] > 1) {
-                  print "规则: " i
-                  # 因为我们没有记录行号（来源于多个文件），这里只输出规则本身
-                  dups++
-                  if(dups>=20) break
-                }
+              for(i in deduped){
+                  print deduped[i] > "tmp/all_deduped.txt"
               }
-              for(j=1;j<=n;j++) print order[j] > "tmp/all_deduped.txt"
-            }
-          ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt || true
-          # ensure deduped exists
-          touch tmp/all_deduped.txt
-          touch tmp/duplicate_rules.txt
-
-      - name: Split whitelist & blocklist and resolve conflicts
-        run: |
-          echo "⚖️ 处理中：黑白名单分离并处理冲突..."
-          # white: starts with @@||
-          grep -E '^@@\|\|' tmp/all_deduped.txt > tmp/whitelist_tmp.txt || true
-          grep -E -v '^@@\|\|' tmp/all_deduped.txt > tmp/blocklist_tmp.txt || true
-          # 生成 whitelist core（去掉行首 @@|| -> || 方便对比）
-          sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt || true
-          # 找到同时存在于 blocklist 的条目（按 core 匹配）
-          grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt || true
-          # 过滤掉冲突项
-          if [ -s tmp/conflict_core.txt ]; then
-            grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt || true
-            grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt || true
-          else
-            # 没有冲突时直接移动
-            mv -f tmp/blocklist_tmp.txt tmp/blocklist.txt || true
-            mv -f tmp/whitelist_tmp.txt tmp/whitelist.txt || true
-          fi
-          # ensure outputs exist
-          touch tmp/conflict_core.txt tmp/whitelist.txt tmp/blocklist.txt
-
-      - name: Add headers and sort outputs
-        run: |
+          }
+          ' tmp/all_cleaned.txt > tmp/duplicate_rules.txt
+          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt)
+          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt)
+          DUP_COUNT=$((RAW_COUNT - DEDUP_COUNT))
+          # 黑白名单冲突处理
+          grep '^@@||' tmp/all_deduped.txt > tmp/whitelist_tmp.txt
+          grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
+          sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
+          grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
+          grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
+          grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
+          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
+          # 添加头部信息
           TIMESTAMP=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S %Z')
-          WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt || echo 0)
-          BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt || echo 0)
+          WHITELIST_COUNT=$(wc -l < tmp/whitelist.txt)
+          BLACKLIST_COUNT=$(wc -l < tmp/blocklist.txt)
           WHITELIST_HEADER="! =====================\n! AdGuardHome 白名单\n! 更新时间: $TIMESTAMP\n! 总条数: $WHITELIST_COUNT\n! =====================\n"
           BLACKLIST_HEADER="! =====================\n! AdGuardHome 黑名单\n! 更新时间: $TIMESTAMP\n! 总条数: $BLACKLIST_COUNT\n! =====================\n"
           echo -e "$WHITELIST_HEADER" > dist/whitelist.txt
-          # 对域名类规则做简单排序保证稳定（若为空则保留 header）
-          if [ -s tmp/whitelist.txt ]; then
-            LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
-          fi
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/whitelist.txt >> dist/whitelist.txt
           echo -e "$BLACKLIST_HEADER" > dist/blocklist.txt
-          if [ -s tmp/blocklist.txt ]; then
-            LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
-          fi
-          # export counts for step outputs
-          RAW_COUNT=$(wc -l < tmp/all_cleaned.txt || echo 0)
-          DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt || echo 0)
-          DUP_COUNT=$(( RAW_COUNT - DEDUP_COUNT ))
-          CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt || echo 0)
+          LC_ALL=C sort -t'.' -k2,2 -k1,1 tmp/blocklist.txt >> dist/blocklist.txt
+          # 输出 step 变量
           echo "raw_count=$RAW_COUNT" >> $GITHUB_OUTPUT
           echo "dedup_count=$DEDUP_COUNT" >> $GITHUB_OUTPUT
           echo "dup_count=$DUP_COUNT" >> $GITHUB_OUTPUT
@@ -174,46 +103,31 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          RAW_COUNT=${{ steps.merge.outputs.raw_count || '' }}
-          # Prepare list of files to add if they exist
-          FILES_TO_ADD=""
-          [ -s dist/whitelist.txt ] && FILES_TO_ADD="$FILES_TO_ADD dist/whitelist.txt"
-          [ -s dist/blocklist.txt ] && FILES_TO_ADD="$FILES_TO_ADD dist/blocklist.txt"
-          [ -s tmp/duplicate_rules.txt ] && FILES_TO_ADD="$FILES_TO_ADD tmp/duplicate_rules.txt"
-          [ -s tmp/conflict_core.txt ] && FILES_TO_ADD="$FILES_TO_ADD tmp/conflict_core.txt"
-          # If nothing to add, set no_change
-          if [ -z "$FILES_TO_ADD" ]; then
-            echo "no_change=true" >> $GITHUB_OUTPUT
-            echo "No files to add; skipping commit."
-            exit 0
-          fi
-          git add $FILES_TO_ADD
-          # if nothing staged, exit with no_change
+          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
+          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
+          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
+          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
+          NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
+          [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
+          COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
+          git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
-            echo "No changes to commit."
+            echo "No new rules to commit"
           else
             echo "no_change=false" >> $GITHUB_OUTPUT
-            DEDUP_COUNT=$(wc -l < tmp/all_deduped.txt || echo 0)
-            CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt || echo 0)
-            RAW_COUNT=$(wc -l < tmp/all_cleaned.txt || echo 0)
-            NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
-            [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
-            COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT:-0} | 抵消: ${CONFLICT_COUNT}"
             git commit -m "$COMMIT_MSG"
             git pull --rebase origin main || true
-            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git || true
+            git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
             echo "commit_message=$COMMIT_MSG" >> $GITHUB_OUTPUT
           fi
 
       - name: Prepare Release Files
         id: release_files
         run: |
-          FILES=""
-          [ -s dist/whitelist.txt ] && FILES="$FILES dist/whitelist.txt"
-          [ -s dist/blocklist.txt ] && FILES="$FILES dist/blocklist.txt"
+          FILES="dist/whitelist.txt dist/blocklist.txt"
           [ -s tmp/duplicate_rules.txt ] && FILES="$FILES tmp/duplicate_rules.txt"
-          [ -s tmp/conflict_core.txt ] && FILES="$FILES tmp/conflict_core.txt"
+          [ -s tmp/conflict_rules.txt ] && FILES="$FILES tmp/conflict_rules.txt"
           echo "files=$FILES" >> $GITHUB_OUTPUT
 
       - name: Create or Update Release
@@ -228,22 +142,22 @@ jobs:
 
       - name: Show Result
         run: |
-          RAW_COUNT=${{ steps.merge.outputs.raw_count || 0 }}
-          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count || 0 }}
-          DUP_COUNT=${{ steps.merge.outputs.dup_count || 0 }}
-          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count || 0 }}
-          WHITELIST_COUNT=${{ steps.merge.outputs.whitelist_count || 0 }}
-          BLACKLIST_COUNT=${{ steps.merge.outputs.blacklist_count || 0 }}
+          RAW_COUNT=${{ steps.merge.outputs.raw_count }}
+          DEDUP_COUNT=${{ steps.merge.outputs.dedup_count }}
+          DUP_COUNT=${{ steps.merge.outputs.dup_count }}
+          CONFLICT_COUNT=${{ steps.merge.outputs.conflict_count }}
+          WHITELIST_COUNT=${{ steps.merge.outputs.whitelist_count }}
+          BLACKLIST_COUNT=${{ steps.merge.outputs.blacklist_count }}
 
           echo "================= ✅ 合并完成 ================="
           echo "原始规则总数：$RAW_COUNT"
           echo "去重后总数：$DEDUP_COUNT"
           echo "重复规则数量：$DUP_COUNT"
           echo "黑白名单冲突数量：$CONFLICT_COUNT"
-          echo "📝 前20条重复规则及示例："
-          head -n 20 tmp/duplicate_rules.txt || true
-          echo "📝 黑白名单冲突抵消（冲突 core 列表）："
-          cat tmp/conflict_core.txt || true
+          echo "📝 前20条重复规则及行号："
+          head -n 20 tmp/duplicate_rules.txt
+          echo "📝 黑白名单冲突抵消规则（按域名显示，白名单和黑名单同一行）："
+          cat tmp/conflict_rules.txt
           echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
           echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
           echo "============================================================"
