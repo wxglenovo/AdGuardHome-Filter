@@ -1,5 +1,3 @@
-
-
 name: Build AdGuardHome rules
 
 on:
@@ -77,6 +75,8 @@ jobs:
           grep -v '^@@||' tmp/all_deduped.txt > tmp/blocklist_tmp.txt
           sed 's/^@@||/||/' tmp/whitelist_tmp.txt > tmp/whitelist_core.txt
           grep -Fxf tmp/whitelist_core.txt tmp/blocklist_tmp.txt > tmp/conflict_core.txt
+          # ✅ 修正：生成 conflict_rules.txt
+          cp tmp/conflict_core.txt tmp/conflict_rules.txt
           grep -Fvxf tmp/conflict_core.txt tmp/blocklist_tmp.txt > tmp/blocklist.txt
           grep -Fvxf tmp/conflict_core.txt tmp/whitelist_tmp.txt > tmp/whitelist.txt
           CONFLICT_COUNT=$(wc -l < tmp/conflict_core.txt)
@@ -110,7 +110,9 @@ jobs:
           NEW_ADDED=$((DEDUP_COUNT - RAW_COUNT + CONFLICT_COUNT))
           [ $NEW_ADDED -lt 0 ] && NEW_ADDED=0
           COMMIT_MSG="🧩 更新 AdGuardHome 规则 | 总数: ${DEDUP_COUNT} | 新增: ${NEW_ADDED} | 去重: ${DUP_COUNT} | 抵消: ${CONFLICT_COUNT}"
-          git add dist/whitelist.txt dist/blocklist.txt tmp/duplicate_rules.txt tmp/conflict_rules.txt
+          git add dist/whitelist.txt dist/blocklist.txt
+          [ -f tmp/duplicate_rules.txt ] && git add tmp/duplicate_rules.txt
+          [ -f tmp/conflict_rules.txt ] && git add tmp/conflict_rules.txt
           if git diff --cached --quiet; then
             echo "no_change=true" >> $GITHUB_OUTPUT
             echo "No new rules to commit"
@@ -157,7 +159,7 @@ jobs:
           echo "📝 前20条重复规则及行号："
           head -n 20 tmp/duplicate_rules.txt
           echo "📝 黑白名单冲突抵消规则（按域名显示，白名单和黑名单同一行）："
-          cat tmp/conflict_rules.txt
+          [ -f tmp/conflict_rules.txt ] && cat tmp/conflict_rules.txt
           echo "📁 白名单文件：dist/whitelist.txt，行数：$WHITELIST_COUNT"
           echo "📁 黑名单文件：dist/blocklist.txt，行数：$BLACKLIST_COUNT"
           echo "============================================================"
