@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2025-11-26 19:26:50 CST
+# ⏰ 更新时间: 2025-11-26 21:00:51 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 127
-# 删除子域数量: 3
-# 清理后规则数量: 124
-# 与上次对比: 减少 3395 条
+# 原始规则数量: 80
+# 删除子域数量: 0
+# 清理后规则数量: 80
+# 与上次对比: 减少 44 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -14,10 +14,9 @@
 #   ▸ 白名单/黑名单前缀独立处理
 # ==========================================================
 
-@@||activity.windows.com^
+@@||5471782.fls.doubleclick.net^|
 @@||ad-putting.gw.zt-express.com^
 @@||adjs.8591.com.tw^$script
-@@||adl.windows.com^
 @@||adm.crowdicity.com^
 @@||adnxs.com/ast/ast.js$domain=zone.msn.com
 @@||adobe.com.ssl.d1.sc.omtrdc.net^$xmlhttprequest,domain=www.adobe.com
@@ -34,107 +33,64 @@
 @@||assets.msn.cn^
 @@||assets.msn.com^
 @@||astatic.ccmbg.com^*/prebid$script,domain=linternaute.com
-@@||au.download.windowsupdate.com^
-@@||baidu.com^
-@@||browser.events.data.microsoft.com^
 @@||c.mipcdn.com^$domain=77dushu.com|biqugecom.com|prpcoin.com|zhetian.org
 @@||c.mipcdn.com^$domain=prpcoin.com
+@@||captcha.su.baidu.com^
 @@||cdn.bootcss.com^$script,domain=59xs.com|biqudd.com|didaxiaoshuo.cc|rijutv.com|shudai.org|xhxswz.com|xsw55.com|ysxs8.com
+@@||cdn.bootcss.com^$script,domain=biqutime.com|59xs.com|biqudd.com|u33.me|xbiqugela.com|ysxs8.vip
 @@||cdn.usefathom.com/script.js$domain=sharpen-free-design-generator.netlify.app
 @@||classliving.lpages.co^|
 @@||click.appcast.io^|
-@@||client.wns.windows.com^
 @@||clk*.tradedoubler.com^|
 @@||cloud.mail.ru^$image,~third-party
+@@||cm-beacon.nakanohito.jp^|
+@@||cm-widget.nakanohito.jp^|
 @@||cn.bing.com^
 @@||content.canadiantire.ca/fp/tags.js$domain=customerauth.triangle.com
-@@||ctldl.windowsupdate.com^
 @@||d.socdm.com/adsv/*/tver_splive$xmlhttprequest,domain=imasdk.googleapis.com
-@@||definitionupdates.microsoft.com^
-@@||dgss0.bdstatic.com^
-@@||displaycatalog.mp.microsoft.com^
-@@||download.windowsupdate.com^
-@@||dss2.bdstatic.com^
-@@||edge.microsoft.com^
-@@||edgestatic.azureedge.net^
 @@||equifaxps.122.2o7.net^
-@@||fe2cr.update.microsoft.com^
-@@||fe3cr.delivery.mp.microsoft.com^
 @@||feed.adrelayer.com^|
 @@||files.slack.com^$image,~third-party
-@@||files2.freedownloadmanager.org^
-@@||functional.events.data.microsoft.com
-@@||g.alicdn.com
 @@||g.doubleclick.net/gampad/ads*%20Web%20Player$domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*RakutenShowtime$xmlhttprequest,domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/live/ads?*%2Flemino_instr%$domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/live/ads?*tver.$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/pagead/ads?*&description_url=https%3A%2F%2Fgames.wkb.jp$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g1.dfcfw.com^
 @@||gbres.dfcfw.com^
-@@||go.microsoft.com^
 @@||go.redirectingat.com^|
-@@||hao123-static.cdn.bcebos.com^
 @@||image.shutterstock.com^$image,domain=icons8.com
 @@||img-s.msn.cn^
 @@||j4.dfcfw.com^
-@@||k.sinaimg.cn
+@@||js.sentry-cdn.com^$script,domain=app.homebinder.com|bolt.new|book.dmm.com|etsy.com|interacty.me|jobs.ch|pizzahut.com.au
 @@||kiplinger.112.2o7.net^
-@@||learn.microsoft.com^
-@@||licensing.mp.microsoft.com^
+@@||learn.khanacademy.org^|
 @@||lightning.bleacherreport.com^*/launch-$~third-party
 @@||login.live.com^
-@@||login.microsoftonline.com^
 @@||login.sendpulse.com^|
 @@||ltzn.9377.com^
 @@||mediav.com/js/feed_ts.js$domain=toutiao.china.com
-@@||msedge.b.tlu.dl.delivery.mp.microsoft.com^
-@@||mydns.jp^
-@@||nav-edge.smartscreen.microsoft.com^
-@@||ntp.msn.cn^
 @@||official.paymaya.com^|
 @@||optout.networkadvertising.org^$document
-@@||outlook.office.com^
-@@||outlook.office365.com
 @@||p.d.1emn.com^$script,domain=hotair.com
 @@||panjiachen.github.io^$generichide
-@@||pcdn-tv-sdk.funshion.com^
 @@||prod.impartner.live^|
-@@||prod.rewardsplatform.microsoft.com^
-@@||productionresultssa5.blob.core.windows.net^
 @@||promo.zendesk.com^$xmlhttprequest,domain=promo.com
-@@||pti.store.microsoft.com^
 @@||pubads.g.doubleclick.net/gampad/ads?*&description_url=https%3A%2F%2Fani.gamer.com.tw$domain=imasdk.googleapis.com
 @@||puma.112.2o7.net^
-@@||purchase.mp.microsoft.com^
 @@||raw.githubusercontent.com^$domain=viewscreen.githubusercontent.com
 @@||redir.tradedoubler.com^|
 @@||sdk.privacy-center.org^$script,domain=20minutos.es|24sata.hr|abc.es|allocine.fr|as.com|atresplayer.com|aukro.cz|auto.it|autopista.es|beinsports.com|belfasttelegraph.co.uk|bfmtv.com|bonduelle.it|cas.sk|ciclismoafondo.es|cnews.fr|corrieredellosport.it|decathlon.pl|dnevnik.hr|dumpert.nl|dziennikwschodni.pl|dziennikzachodni.pl|ebuyclub.com|edreams.de|edreams.net|elcomercio.es|elconfidencial.com|elespanol.com|eltiempo.es|euronews.com|europe1.fr|filmweb.pl|fip.fr|flair.be|france24.com|franceculture.fr|franceinfo.fr|franceinter.fr|francetvinfo.fr|frandroid.com|funradio.fr|fyndiq.dk|fyndiq.fi|fyndiq.no|fyndiq.se|gamepro.de|gamestar.de|giphy.com|gloswielkopolski.pl|gofeminin.de|goplay.be|gva.be|hablandoenplata.es|hbvl.be|idealista.it|ivoox.com|jeanmarcmorandini.com|jeuxvideo.com|jofogas.hu|kotimikro.fi|krone.at|kurier.at|ladepeche.fr|lalibre.be|lasexta.com|lasprovincias.es|lavanguardia.com|leboncoin.fr|leparisien.fr|lequipe.fr|letelegramme.fr|marca.com|marianne.net|mein-mmo.de|melty.fr|metronieuws.nl|mitula.pt|motociclismo.es|mountainbike.es|movilzona.es|mundo-geo.es|mundodeportivo.com|mundogravel.es|na.se|naszemiasto.pl|nicematin.com|nieuwsblad.be|numerama.com|ondacero.es|onmeda.de|opodo.ch|opodo.co.uk|opodo.com|opodo.com.au|opodo.de|opodo.dk|opodo.es|opodo.fi|opodo.fr|opodo.it|opodo.nl|opodo.no|opodo.pl|opodo.se|opto.sic.pt|orpi.com|otempo.pt|podcasts.leparisien.fr|profil.at|publicsenat.fr|rainberrytv.com|recup.paylib.fr|revistaoxigeno.es|rfi.fr|rmcbfmplay.com|rtbf.be|rtl.be|rtl.fr|science-et-vie.com|sensacine.com|serially.it|sfgame.net|sncf-connect.com|softonic.com|soycorredor.es|sportlife.es|standaard.be|strefabiznesu.pl|telegraaf.nl|tportal.hr|trailrun.es|triatlonweb.es|tuttosport.com|vecernji.hr|video-streaming.orange.fr|xataka.com
 @@||search.spotxchange.com/vmap/*&content_page_url=www.bsfuji.tv$xmlhttprequest,domain=imasdk.googleapis.com
 @@||secureimage.securedataimages.com^|
 @@||sgqcvfjvr.onet.pl^
-@@||slscr.update.microsoft.com^
-@@||soft.wsyhn.com^
-@@||storeedgefd.dsx.mp.microsoft.com^
-@@||str.hit.gemius.pl^|
-@@||substrate.office.com^
 @@||support-beacon.nakanohito.jp^|
 @@||support-widget.nakanohito.jp^|
-@@||support.microsoft.com^
-@@||tas02.sls.update.microsoft.com^
-@@||time.windows.com^
-@@||tlu.dl.delivery.mp.microsoft.com^
-@@||tv.sohu.com^
+@@||teams.live.com^$generichide
 @@||vitacost.122.2o7.net^
 @@||vodafonelimited.tt.omtrdc.net^
 @@||ware.shop.jd.com^$genericblock,generichide
 @@||web.telegram.org^$generichide
 @@||webquotepic.eastmoney.com^
 @@||widget.myrentacar.me^$script,subdocument
-@@||www.baidu.com^
 @@||www.bing.com^
 @@||www.eastmoney.com^
-@@||www.freedownloadmanager.org^
-@@||www.hao123.com^
-@@||www.msftconnecttest.com^
 @@||www.msn.cn^
