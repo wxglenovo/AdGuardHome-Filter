@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2025-12-13 16:36:56 CST
+# ⏰ 更新时间: 2025-12-13 18:31:59 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 110
+# 原始规则数量: 112
 # 删除子域数量: 0
-# 清理后规则数量: 110
-# 与上次对比: 无变化 0 条
+# 清理后规则数量: 112
+# 与上次对比: 增加 2 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -116,7 +116,9 @@
 @@||teams.live.com^$generichide
 @@||testsafebrowsing.appspot.com^
 @@||vitacost.122.2o7.net^
+@@||vodafonelimited.tt.omtrdc.net^
 @@||ware.shop.jd.com^$genericblock,generichide
+@@||web.telegram.org^$generichide
 @@||webquotepic.eastmoney.com^
 @@||widget.myrentacar.me^$script,subdocument
 @@||wikia.nocookie.net^$script,domain=fandom.com
