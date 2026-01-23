@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2026-01-23 22:42:57 CST
+# ⏰ 更新时间: 2026-01-24 00:48:38 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
 # 原始规则数量: 182
 # 删除子域数量: 5
 # 清理后规则数量: 177
-# 与上次对比: 减少 1 条
+# 与上次对比: 无变化 0 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -62,7 +62,6 @@
 @@||client.wns.windows.com^
 @@||clk*.tradedoubler.com^|
 @@||cloud.mail.ru^$image,~third-party
-@@||clouderrorreporting.googleapis.com^$domain=waze.com
 @@||cm-beacon.nakanohito.jp^|
 @@||cm-widget.nakanohito.jp^|
 @@||cn.bing.com^
@@ -166,6 +165,7 @@
 @@||stream.adunity.com^$xmlhttprequest,domain=b1tv.ro
 @@||substrate.office.com^
 @@||support-beacon.nakanohito.jp^|
+@@||support-widget.nakanohito.jp^|
 @@||support.microsoft.com^
 @@||taobao.com^
 @@||tas02.sls.update.microsoft.com^
