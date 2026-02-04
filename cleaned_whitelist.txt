@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 白名单 自动构建信息
-# ⏰ 更新时间: 2026-02-04 22:58:36 CST
+# ⏰ 更新时间: 2026-02-05 01:06:24 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/whitelist.txt
 # --------------------------------------------------------
-# 原始规则数量: 184
+# 原始规则数量: 182
 # 删除子域数量: 5
-# 清理后规则数量: 179
-# 与上次对比: 无变化 0 条
+# 清理后规则数量: 177
+# 与上次对比: 减少 2 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -92,7 +92,6 @@
 @@||fundingchoicesmessages.google.com/i/$script,domain=9to5mac.com|fanatik.com.tr|globo.com|kledgeb.blogspot.com
 @@||g.alicdn.com
 @@||g.doubleclick.net/gampad/ads*%20Web%20Player$domain=imasdk.googleapis.com
-@@||g.doubleclick.net/gampad/ads?*%2Ftver.$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*.crunchyroll.com$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/ads?*RakutenShowtime$xmlhttprequest,domain=imasdk.googleapis.com
 @@||g.doubleclick.net/gampad/live/ads?*%2Flemino_instr%$domain=imasdk.googleapis.com
@@ -166,7 +165,6 @@
 @@||stream.adunity.com^$xmlhttprequest,domain=b1tv.ro
 @@||substrate.office.com^
 @@||support-beacon.nakanohito.jp^|
-@@||support-widget.nakanohito.jp^|
 @@||support.microsoft.com^
 @@||taobao.com^
 @@||tas02.sls.update.microsoft.com^
