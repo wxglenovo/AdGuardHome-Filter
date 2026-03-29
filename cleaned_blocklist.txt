@@ -1,12 +1,12 @@
 ###########################################################
 # 📅 AdGuardHome 黑名单 自动构建信息
-# ⏰ 更新时间: 2026-03-29 18:50:18 CST
+# ⏰ 更新时间: 2026-03-29 21:16:02 CST
 # 🌐 规则来源: https://raw.githubusercontent.com/wxglenovo/AdGuardHome-Filter/refs/heads/main/dist/blocklist.txt
 # --------------------------------------------------------
-# 原始规则数量: 30247
+# 原始规则数量: 30267
 # 删除子域数量: 0
-# 清理后规则数量: 30247
-# 与上次对比: 减少 4 条
+# 清理后规则数量: 30267
+# 与上次对比: 增加 20 条
 # --------------------------------------------------------
 # 🧩 说明:
 #   ▸ 父子域匹配严格：父域层级 < 子域层级，子域末尾等于父域，后缀完全一致（包括 $ 参数）
@@ -16,6 +16,7 @@
 
 - DOMAIN,0-0-0-birkart-clws-ifs-globalmn.activecampaign.tt.omtrdc.net
 - DOMAIN,0-0-0-birkart-clws-ifs-globalmn.bcbsnc.tt.omtrdc.net
+- DOMAIN,0-0-0-birkart-clws-ifs-globalmn.hrblock.tt.omtrdc.net
 - DOMAIN,0-0-0-birkart-clws-ifs-globalmn.jcb.tt.omtrdc.net
 - DOMAIN,0-0-0-birkart-clws-ifs-globalmn.lululemonusa.tt.omtrdc.net
 - DOMAIN,0-0-0-birkart-clws-ifs-globalmn.omron.tt.omtrdc.net
@@ -111,7 +112,6 @@
 - DOMAIN,10.32.17.182adobecorp.hb-api.tt.omtrdc.net
 - DOMAIN,10.32.17.182adobecorp.hb.tt.omtrdc.net
 - DOMAIN,10.32.17.182cbsinteractive.hb.tt.omtrdc.net
-- DOMAIN,10.32.17.182fandango.hb.tt.omtrdc.net
 - DOMAIN,10.32.17.182fortis.hb.tt.omtrdc.net
 - DOMAIN,10.32.17.182nationalgeographic.hb-api.tt.omtrdc.net
 - DOMAIN,10.32.17.182nbcume.hb.tt.omtrdc.net
@@ -1311,6 +1311,7 @@
 - DOMAIN,landsend.tt.omtrdc.net
 - DOMAIN,lasalle.tt.omtrdc.net
 - DOMAIN,lazard.tt.omtrdc.net
+- DOMAIN,lch.tt.omtrdc.net
 - DOMAIN,ldschurch.tt.omtrdc.net
 - DOMAIN,lebara.tt.omtrdc.net
 - DOMAIN,ledcorinc.tt.omtrdc.net
@@ -1369,6 +1370,7 @@
 - DOMAIN,marriottownershipres.tt.omtrdc.net
 - DOMAIN,maruig.tt.omtrdc.net
 - DOMAIN,marvel.tt.omtrdc.net
+- DOMAIN,marykay.tt.omtrdc.net
 - DOMAIN,mastercard.tt.omtrdc.net
 - DOMAIN,mattel.tt.omtrdc.net
 - DOMAIN,mauriceblackburn.tt.omtrdc.net
@@ -1881,6 +1883,7 @@
 - DOMAIN,systemeu.tt.omtrdc.net
 - DOMAIN,t.imgur.com
 - DOMAIN,tafequeensland.tt.omtrdc.net
+- DOMAIN,tagespiegel.tt.omtrdc.net
 - DOMAIN,taitra.tt.omtrdc.net
 - DOMAIN,takedapharmaceutical.tt.omtrdc.net
 - DOMAIN,talbotsinc.tt.omtrdc.net
@@ -2121,7 +2124,6 @@
 - DOMAIN,westpublishingcorpor.tt.omtrdc.net
 - DOMAIN,westservicesfindlaw.tt.omtrdc.net
 - DOMAIN,westservicesinc.tt.omtrdc.net
-- DOMAIN,wgu.tt.omtrdc.net
 - DOMAIN,wheelpros.tt.omtrdc.net
 - DOMAIN,whirlpool.tt.omtrdc.net
 - DOMAIN,whirlpoolindia.tt.omtrdc.net
@@ -2417,12 +2419,14 @@
 - DOMAIN-SUFFIX,10.32.17.181abcnews.hb-api.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.182adobecorp.hb-api.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.182adobecorp.hb.tt.omtrdc.net
+- DOMAIN-SUFFIX,10.32.17.182cbsinteractive.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.182fandango.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.182fortis.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.182nbcume.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.241adobecorp.hb-api.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.241adobecorp.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.241foxnews.hb.tt.omtrdc.net
+- DOMAIN-SUFFIX,10.32.17.241newimagitasinc.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.241warnerbrosentertainmentinc.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.242aem.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,10.32.17.242cbsnews.hb-api.tt.omtrdc.net
@@ -2553,6 +2557,7 @@
 - DOMAIN-SUFFIX,17.251abcotv.hb-api.tt.omtrdc.net
 - DOMAIN-SUFFIX,17.251cbs.hb-api.tt.omtrdc.net
 - DOMAIN-SUFFIX,17.251cbsdigitalmedia.hb.tt.omtrdc.net
+- DOMAIN-SUFFIX,17.251comcastentertainmentgroup.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,17.251corus.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,17.251nascardigitalsap.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,17.251nfl.hb.tt.omtrdc.net
@@ -2568,6 +2573,7 @@
 - DOMAIN-SUFFIX,1762960362428-aboard-shoes.surge.sh
 - DOMAIN-SUFFIX,178adobecorp.hb.tt.omtrdc.net
 - DOMAIN-SUFFIX,17dishpurchasingcorporation.hb-api.tt.omtrdc.net
+- DOMAIN-SUFFIX,18-devthakor.github.io
 - DOMAIN-SUFFIX,1822direkt.tt.omtrdc.net
 - DOMAIN-SUFFIX,1827897262.v.123pan.cn
 - DOMAIN-SUFFIX,1827h12.weebly.com
@@ -3217,6 +3223,7 @@
 - DOMAIN-SUFFIX,3898378.notify6.com
 - DOMAIN-SUFFIX,3903162.notify6.com
 - DOMAIN-SUFFIX,3903164.notify6.com
+- DOMAIN-SUFFIX,3909064.notify6.com
 - DOMAIN-SUFFIX,3914108.notify6.com
 - DOMAIN-SUFFIX,3915078.notify6.com
 - DOMAIN-SUFFIX,3917502.notify6.com
@@ -3376,6 +3383,7 @@
 - DOMAIN-SUFFIX,476akgzpk3txuzh-c.adkclicker.fr
 - DOMAIN-SUFFIX,476akgzpk3txuzh-p.adkclicker.fr
 - DOMAIN-SUFFIX,4794988.notify6.com
+- DOMAIN-SUFFIX,4795030.notify6.com
 - DOMAIN-SUFFIX,4795268.notify6.com
 - DOMAIN-SUFFIX,4795272.notify6.com
 - DOMAIN-SUFFIX,4795534.notify6.com
@@ -3397,6 +3405,7 @@
 - DOMAIN-SUFFIX,4847642.notify6.com
 - DOMAIN-SUFFIX,4863208.notify6.com
 - DOMAIN-SUFFIX,4864id.weebly.com
+- DOMAIN-SUFFIX,4872274.notify6.com
 - DOMAIN-SUFFIX,4872816.notify6.com
 - DOMAIN-SUFFIX,4881146.notify6.com
 - DOMAIN-SUFFIX,4882844.notify6.com
@@ -3707,6 +3716,7 @@
 - DOMAIN-SUFFIX,a5.1xasset.com
 - DOMAIN-SUFFIX,a546sd57f6879g8ouaet464sdfiytusra463wtzdf0d1.teemill.com
 - DOMAIN-SUFFIX,a6u4s5d76f87g9gyirfqzjm6ilo8ei57tfy57tdh46yu5fs.teemill.com
+- DOMAIN-SUFFIX,a8.01cloud.jp
 - DOMAIN-SUFFIX,a8.2ndstreet.jp
 - DOMAIN-SUFFIX,a8.cbd-oil.jp
 - DOMAIN-SUFFIX,a8.dymtech.jp
@@ -4350,6 +4360,7 @@
 - DOMAIN-SUFFIX,adtrack.kireibiz.jp
 - DOMAIN-SUFFIX,adv-sv-show.focus.cn
 - DOMAIN-SUFFIX,adv-sv-stat.focus.cn
+- DOMAIN-SUFFIX,adv.anhsangvacuocsong.vn
 - DOMAIN-SUFFIX,adv.autosurf.vn
 - DOMAIN-SUFFIX,adv.forpsi.hu
 - DOMAIN-SUFFIX,adv.wp.pl
@@ -7517,7 +7528,6 @@
 - DOMAIN-SUFFIX,cetelemspain.tt.omtrdc.net
 - DOMAIN-SUFFIX,ceuencarnado.fumblingvacation.pro
 - DOMAIN-SUFFIX,cewecolorde.tt.omtrdc.net
-- DOMAIN-SUFFIX,ceyssteam.bos.ru
 - DOMAIN-SUFFIX,cf-pixelfront-analytics.widencdn.net
 - DOMAIN-SUFFIX,cfdgfhfddfdgfcgf.framer.photos
 - DOMAIN-SUFFIX,cffscb.blogspot.ch
@@ -9667,6 +9677,7 @@
 - DOMAIN-SUFFIX,dmplouhjkla.web.app
 - DOMAIN-SUFFIX,dmpoilzambisdfdk.web.app
 - DOMAIN-SUFFIX,dmr.cnhoney.com
+- DOMAIN-SUFFIX,dms.xuexxing.com
 - DOMAIN-SUFFIX,dnajngiv.web.app
 - DOMAIN-SUFFIX,dnbbankasa.tt.omtrdc.net
 - DOMAIN-SUFFIX,dnp.tt.omtrdc.net
@@ -10942,6 +10953,7 @@
 - DOMAIN-SUFFIX,email.heiq.com
 - DOMAIN-SUFFIX,email.heis.ch
 - DOMAIN-SUFFIX,email.hello.springhealth.com
+- DOMAIN-SUFFIX,email.hello.teemea.com
 - DOMAIN-SUFFIX,email.hellozest.io
 - DOMAIN-SUFFIX,email.helpcrunch-mail.com
 - DOMAIN-SUFFIX,email.hesby-vet.fuga.eu
@@ -17840,6 +17852,7 @@
 - DOMAIN-SUFFIX,login.imm2.com
 - DOMAIN-SUFFIX,login.microsofltonline.org
 - DOMAIN-SUFFIX,login.tracking101.com
+- DOMAIN-SUFFIX,login.unibots.in
 - DOMAIN-SUFFIX,login.wwwu31.com
 - DOMAIN-SUFFIX,login2mailo.weebly.com
 - DOMAIN-SUFFIX,loginaccount6.wixsite.com
@@ -19030,6 +19043,7 @@
 - DOMAIN-SUFFIX,mine.nahnoji.cz
 - DOMAIN-SUFFIX,minecasthtmlng.weebly.com
 - DOMAIN-SUFFIX,minedfc.pory.app
+- DOMAIN-SUFFIX,miner.nablabee.com
 - DOMAIN-SUFFIX,minevip2016.weebly.com
 - DOMAIN-SUFFIX,mingming20160152.github.io
 - DOMAIN-SUFFIX,minimum-aside-561135.framer.app
@@ -24911,6 +24925,7 @@
 - DOMAIN-SUFFIX,ssc.nick.tv
 - DOMAIN-SUFFIX,ssc.nickatnite.com
 - DOMAIN-SUFFIX,ssc.nickelodeon.be
+- DOMAIN-SUFFIX,ssc.nickelodeon.dk
 - DOMAIN-SUFFIX,ssc.nickelodeon.ee
 - DOMAIN-SUFFIX,ssc.nickelodeon.fr
 - DOMAIN-SUFFIX,ssc.nickelodeon.lt
@@ -26313,10 +26328,12 @@
 - DOMAIN-SUFFIX,tk.santevet.com
 - DOMAIN-SUFFIX,tkby3jr9.r.us-east-1.awstrack.me
 - DOMAIN-SUFFIX,tkcatrun.aotter.net
+- DOMAIN-SUFFIX,tkcatwalk.aotter.net
 - DOMAIN-SUFFIX,tkmedia-cache.aotter.net
 - DOMAIN-SUFFIX,tkmedia.aotter.net
 - DOMAIN-SUFFIX,tkmftc.aotter.net
 - DOMAIN-SUFFIX,tkportal.aotter.net
+- DOMAIN-SUFFIX,tkrecorder.aotter.net
 - DOMAIN-SUFFIX,tktracker.aotter.net
 - DOMAIN-SUFFIX,tlcrelationshipmanag.tt.omtrdc.net
 - DOMAIN-SUFFIX,tltpyy.saatchiart.com
@@ -26607,6 +26624,7 @@
 - DOMAIN-SUFFIX,tracker.mmdlv.it
 - DOMAIN-SUFFIX,tracker.mtrtb.com
 - DOMAIN-SUFFIX,tracker.phunusuckhoe.vn
+- DOMAIN-SUFFIX,tracker.phunuvagiadinh.vn
 - DOMAIN-SUFFIX,tracker.prod.ams3.k8s.hyperia.sk
 - DOMAIN-SUFFIX,tracker.remp-beam.golem.de
 - DOMAIN-SUFFIX,tracker.selectivv.com
@@ -28751,6 +28769,7 @@
 - DOMAIN-SUFFIX,www.3662967.notify6.com
 - DOMAIN-SUFFIX,www.3684237.notify6.com
 - DOMAIN-SUFFIX,www.3731701.notify6.com
+- DOMAIN-SUFFIX,www.3856281.notify6.com
 - DOMAIN-SUFFIX,www.3881818.notify6.com
 - DOMAIN-SUFFIX,www.3959278.notify6.com
 - DOMAIN-SUFFIX,www.3959292.notify6.com
@@ -29841,6 +29860,7 @@
 ﻿- DOMAIN,ekornes.tt.omtrdc.net
 ﻿- DOMAIN,eset.tt.omtrdc.net
 ﻿- DOMAIN,eurocookie.galilcloud.wixapps.net
+﻿- DOMAIN,fgh.tt.omtrdc.net
 ﻿- DOMAIN,fiservsolution.tt.omtrdc.net
 ﻿- DOMAIN,grupomonge.tt.omtrdc.net
 ﻿- DOMAIN,hcsc.tt.omtrdc.net
@@ -29854,12 +29874,12 @@
 ﻿- DOMAIN,pfp.sina.net
 ﻿- DOMAIN,polycominc.tt.omtrdc.net
 ﻿- DOMAIN,sunbeltrentals.tt.omtrdc.net
-﻿- DOMAIN,tagespiegel.tt.omtrdc.net
 ﻿- DOMAIN,tatadigitial.tt.omtrdc.net
 ﻿- DOMAIN,uob.tt.omtrdc.net
 ﻿- DOMAIN,webcache-eu.datareporter.eu
 ﻿- DOMAIN,webcache.datareporter.eu
 ﻿- DOMAIN,westservicesinc.tt.omtrdc.net
+﻿- DOMAIN,wgu.tt.omtrdc.net
 ﻿- DOMAIN,www.mammothmountainskiar.tt.omtrdc.net
 ﻿- DOMAIN-SUFFIX,0-0-0-birkart-clws-ifs-globalmn.anntaylorinc.tt.omtrdc.net
 ﻿- DOMAIN-SUFFIX,0-0-0-birkart-clws-ifs-globalmn.brp.tt.omtrdc.net
